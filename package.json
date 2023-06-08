@@ -1,5 +1,5 @@
 {
-  "name": "cosmos-api",
+  "name": "cosmos-indexer",
   "version": "1.0.0",
   "main": "./build/index.js",
   "typings": "./build/index.d.ts",
