@@ -133,10 +133,6 @@ class MyClient extends StargateClient {
         super(client, {});
         this.rpcUrl = opts.rpcUrl;
         this.priority = opts.priority;
-
-        setInterval(() => {
-            console.log(`STATS rpc ${this.rpcUrl} ok ${this.ok} fail ${this.fail}`)
-        }, 30000)
     }
 
     static async create(opts: MyClientOptions): Promise<MyClient> {
