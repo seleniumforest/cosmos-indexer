@@ -3,15 +3,16 @@ import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
 import { defaultRegistryUrls, isFulfilled } from "./constants";
 import { chains } from "chain-registry";
-import { StargateClient } from "@cosmjs/stargate";
+import { Block, StargateClient } from "@cosmjs/stargate";
 import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
+import { IndexerClient } from "./indexerClient";
 
 export class NetworkManager {
     readonly minRequestsToTest: number = 20;
     readonly network: string = "";
-    clients: MyClient[] = [];
+    clients: IndexerClient[] = [];
 
-    private constructor(network: string, clients: MyClient[]) {
+    private constructor(network: string, clients: IndexerClient[]) {
         this.network = network;
         this.clients = clients;
     }
@@ -37,11 +38,11 @@ export class NetworkManager {
         return new NetworkManager(network.name, registryRpcClients.concat(customRpcClients));
     }
 
-    static async getClients(rpcs: string[], priority: boolean): Promise<MyClient[]> {
+    static async getClients(rpcs: string[], priority: boolean): Promise<IndexerClient[]> {
         let clients = await Promise.allSettled(
             rpcs.map(async (rpcUrl) => {
                 try {
-                    return await MyClient.create({ rpcUrl, priority });
+                    return await IndexerClient.create({ rpcUrl, priority });
                 } catch {
                     return Promise.reject();
                 }
@@ -96,7 +97,7 @@ export class NetworkManager {
         return result;
     }
 
-    getClients(): MyClient[] {
+    getClients(): IndexerClient[] {
         let result = this.clients
             .sort((a, b) => a.ok + a.fail > b.ok + b.fail ? 1 : -1);
 
@@ -121,34 +122,4 @@ export class NetworkManager {
             return (a.ok / (a.fail || 1)) > (b.ok / (b.fail || 1)) ? 1 : 0;
         });
     }
-}
-
-class MyClient extends StargateClient {
-    ok: number = 0;
-    fail: number = 0;
-    rpcUrl: string = "";
-    priority: boolean = false;
-
-    private constructor(client: Tendermint34Client, opts: MyClientOptions) {
-        super(client, {});
-        this.rpcUrl = opts.rpcUrl;
-        this.priority = opts.priority;
-    }
-
-    static async create(opts: MyClientOptions): Promise<MyClient> {
-        let client = await Tendermint34Client.connect(opts.rpcUrl);
-        return new MyClient(client, opts);
-    }
-
-    public reportStats(result: boolean): void {
-        if (result)
-            this.ok++;
-        else
-            this.fail++;
-    }
-}
-
-interface MyClientOptions {
-    rpcUrl: string,
-    priority: boolean
 }

@@ -23,17 +23,11 @@ export class ApiManager {
     async fetchLatestHeight(lastKnownHeight: number = 0): Promise<number> {
         let clients = this.manager.getClients();
 
-        let results = await Promise.allSettled(clients.map(async client => {
-            try {
-                let lastestHeight = await client.getHeight();
-
-                client.reportStats(true);
-                return lastestHeight;
-            } catch (err: any) {
-                client.reportStats(false);
-                return Promise.reject(err?.message);
-            }
-        }));
+        let results = await Promise.allSettled(
+            clients.map(async client => {
+                return await client.getHeight()
+            })        
+        );
 
         let success = results.filter(isFulfilled).map(x => x.value) as number[];
         let result = Math.max(...success, lastKnownHeight);
@@ -50,13 +44,8 @@ export class ApiManager {
 
         for (const client of clients) {
             try {
-                let block = await client.getBlock(height);
-                client.reportStats(true);
-
-                return block;
+                return await client.getBlock(height)
             } catch (err: any) {
-                client.reportStats(false);
-
                 let msg = `Error fetching block header in ${this.manager.network} rpc ${client.rpcUrl} error : ${err?.message}`;
                 console.log(new Error(msg));
             }
@@ -70,13 +59,8 @@ export class ApiManager {
 
         for (const client of clients) {
             try {
-                let txs = await client.searchTx({ height });
-                client.reportStats(true);
-
-                return txs;
+                return await client.searchTx({ height })
             } catch (err: any) {
-                client.reportStats(false)
-
                 let msg = `Error fetching indexed txs in ${this.manager.network} rpc ${client.rpcUrl} error : ${err?.message}`;
                 console.log(new Error(msg));
             }
