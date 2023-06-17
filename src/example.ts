@@ -1,12 +1,11 @@
-import { BlocksWatcher, DataToFetch } from "./blocksWatcher";
+import { BlocksWatcher } from "./blocksWatcher";
 
 (async () => {
     await BlocksWatcher
         .create()
         .addNetwork({ 
-            name: "stride", 
-            fromBlock: 3947143, 
-            dataToFetch: DataToFetch.HEADER_AND_INDEXED_TRANSACTIONS 
+            name: "stargaze", 
+            dataToFetch: "RAW_TXS"
         })
         .useChainRegistryRpcs()
         .useBatchFetching(5)

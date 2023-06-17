@@ -14,6 +14,9 @@ export class NetworkManager {
 
     private constructor(network: string, clients: IndexerClient[]) {
         this.network = network;
+
+        if (clients.length === 0) 
+            console.log("No rpcs found");
         this.clients = clients;
     }
 
@@ -81,8 +84,9 @@ export class NetworkManager {
     static async fetchChainsData(registryUrls: string[], chain: string): Promise<Chain> {
         for (let url of registryUrls) {
             try {
-                let response = await axios.get<Chain>(
-                    `${url}/${chain}/chain.json`, { timeout: 10000 }
+                let response = await axios.get<Chain>( 
+                    `${url}/${chain}/chain.json`, 
+                    { timeout: 10000 }
                 )
 
                 return response.data;
@@ -92,7 +96,7 @@ export class NetworkManager {
 
         let result = chains.find(x => x.chain_name === chain);
         if (!result)
-            throw Error(`fetchChainsData: unknown chain ${chain}`)
+            throw new Error(`fetchChainsData: unknown chain ${chain}`)
 
         return result;
     }
@@ -106,8 +110,7 @@ export class NetworkManager {
                 prev > cur.ok + cur.fail ? cur.ok + cur.fail : prev, Number.POSITIVE_INFINITY);
 
         if (minRequests < this.minRequestsToTest)
-            return result
-        //.sort((a, _) => a.priority ? -1 : 1)
+            return result;
 
         return result.sort((a, b) => {
             if (a.priority)

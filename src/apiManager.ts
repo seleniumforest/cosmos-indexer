@@ -24,9 +24,7 @@ export class ApiManager {
         let clients = this.manager.getClients();
 
         let results = await Promise.allSettled(
-            clients.map(async client => {
-                return await client.getHeight()
-            })        
+            clients.map(client => client.getHeight())        
         );
 
         let success = results.filter(isFulfilled).map(x => x.value) as number[];
