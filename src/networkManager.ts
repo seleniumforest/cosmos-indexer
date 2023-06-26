@@ -3,6 +3,8 @@ import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
 import { defaultRegistryUrls, isFulfilled } from "./constants";
 import { chains } from "chain-registry";
+import { Block, StargateClient } from "@cosmjs/stargate";
+import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { IndexerClient } from "./indexerClient";
 
 export class NetworkManager {
@@ -97,6 +99,10 @@ export class NetworkManager {
             throw new Error(`fetchChainsData: unknown chain ${chain}`)
 
         return result;
+    }
+
+    getRpcs() : string[] {
+        return this.clients.map(x => x.rpcUrl);
     }
 
     getClients(): IndexerClient[] {
