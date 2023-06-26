@@ -5,9 +5,9 @@ import { Network } from "./blocksWatcher";
 import { Block, IndexedTx } from "@cosmjs/stargate";
 
 export class ApiManager {
-    readonly manager: NetworkManager;
+    protected readonly manager: NetworkManager;
 
-    private constructor(manager: NetworkManager) {
+    protected constructor(manager: NetworkManager) {
         this.manager = manager;
     }
 
@@ -30,9 +30,8 @@ export class ApiManager {
         let success = results.filter(isFulfilled).map(x => x.value) as number[];
         let result = Math.max(...success, lastKnownHeight);
 
-        if (result === 0) {
+        if (lastKnownHeight > 0 && result === 0) 
             throw new CantGetLatestHeightErr(this.manager.network, clients.map(x => x.rpcUrl));
-        }
 
         return result;
     }

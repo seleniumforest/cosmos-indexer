@@ -3,16 +3,14 @@ import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
 import { defaultRegistryUrls, isFulfilled } from "./constants";
 import { chains } from "chain-registry";
-import { Block, StargateClient } from "@cosmjs/stargate";
-import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { IndexerClient } from "./indexerClient";
 
 export class NetworkManager {
-    readonly minRequestsToTest: number = 20;
+    protected readonly minRequestsToTest: number = 20;
     readonly network: string = "";
-    clients: IndexerClient[] = [];
+    protected clients: IndexerClient[] = [];
 
-    private constructor(network: string, clients: IndexerClient[]) {
+    protected constructor(network: string, clients: IndexerClient[]) {
         this.network = network;
 
         if (clients.length === 0) 
