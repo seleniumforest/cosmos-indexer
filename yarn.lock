@@ -387,10 +387,10 @@ brorand@^1.1.0:
   resolved "https://registry.npmjs.org/brorand/-/brorand-1.1.0.tgz"
   integrity sha512-cKV8tMCEpQs4hK/ik71d6LrPOnpkpGBR0wzxqr68g2m/LB2GxVYQroAjMJZRVM1Y4BCjCKc3vAamxSzOY2RP+w==
 
-chain-registry@1.13.0:
-  version "1.13.0"
-  resolved "https://registry.yarnpkg.com/chain-registry/-/chain-registry-1.13.0.tgz#375d7cbc7288f9915bde11758355a49c90395b4d"
-  integrity sha512-LFfKuEN2fV1QHJuTdqz1VmdiMGy87yAAYODy6i6/9tC+m6hwDroIPhR8iwuY4BxyJMZj9yr2cpD8m+8X8cZ/PA==
+chain-registry@1.18.1:
+  version "1.18.1"
+  resolved "https://registry.yarnpkg.com/chain-registry/-/chain-registry-1.18.1.tgz#a172438581008ad10fdb1cbea1d15d2630bdac9b"
+  integrity sha512-2gtfztKHjGKPp7BEHSLfsdWucufdhlmIn5I48S8hA3Z5cNIP+ld0yi2N+eyV0HtqW342HEi8wVmGB5Ll0nULAA==
   dependencies:
     "@babel/runtime" "^7.21.0"
     "@chain-registry/types" "^0.16.0"

@@ -17,7 +17,7 @@
     "@protobufs/cosmos": "^0.1.0",
     "axios": "^0.27.2",
     "big.js": "^6.2.1",
-    "chain-registry": "1.13.0",
+    "chain-registry": "1.18.1",
     "cosmjs-types": "^0.6.1",
     "eventemitter3": "^4.0.7",
     "global": "^4.4.0",

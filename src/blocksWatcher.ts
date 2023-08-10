@@ -2,23 +2,6 @@ import { defaultRegistryUrls } from './constants';
 import { ApiManager } from './apiManager';
 import { Block, IndexedTx } from '@cosmjs/stargate';
 
-export interface Network {
-    name: string,
-    fromBlock?: number,
-    dataToFetch?: DataToFetch
-    rpcUrls?: string[]
-}
-
-export interface WatcherContext {
-    networkName: string
-}
-
-export type DataToFetch = "RAW_TXS" | "INDEXED_TXS";
-
-export interface IndexedBlock extends Omit<Block, "txs"> {
-    txs: IndexedTx[]
-}
-
 export class BlocksWatcher {
     chains: Network[] = [];
     registryUrls: string[] = [];
@@ -160,9 +143,25 @@ export class BlocksWatcher {
                 memoizedBlocks.clear();
 
             if (!skipGetLatestHeight) {
-                console.log("waiting 5000 ms")
                 await new Promise(res => setTimeout(res, 5000));
             }
         }
     }
+}
+
+export interface Network {
+    name: string,
+    fromBlock?: number,
+    dataToFetch?: DataToFetch
+    rpcUrls?: string[]
+}
+
+export interface WatcherContext {
+    networkName: string
+}
+
+export type DataToFetch = "RAW_TXS" | "INDEXED_TXS";
+
+export interface IndexedBlock extends Omit<Block, "txs"> {
+    txs: IndexedTx[]
 }
