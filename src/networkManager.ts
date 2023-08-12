@@ -3,8 +3,6 @@ import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
 import { defaultRegistryUrls, isFulfilled } from "./constants";
 import { chains } from "chain-registry";
-import { Block, StargateClient } from "@cosmjs/stargate";
-import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { IndexerClient } from "./indexerClient";
 
 export class NetworkManager {
@@ -15,7 +13,7 @@ export class NetworkManager {
     protected constructor(network: string, clients: IndexerClient[]) {
         this.network = network;
 
-        if (clients.length === 0) 
+        if (clients.length === 0)
             console.log("No rpcs found");
         this.clients = clients;
     }
@@ -27,13 +25,12 @@ export class NetworkManager {
     ): Promise<NetworkManager> {
         let registryRpcUrls: string[] = [];
         let customRpcUrls = network.rpcUrls || [];
-        if (addChainRegistryRpcs) {
-            let response = await this.fetchChainsData(registryUrls, network.name);
-            registryRpcUrls = response?.apis?.rpc?.map(x => x.address)!
-        }
+        let onlyIndexingRpcs = network.dataToFetch === "INDEXED_TXS";
+        if (addChainRegistryRpcs)
+            registryRpcUrls = await this.getChainRpcs(registryUrls, network.name);
 
-        registryRpcUrls = await this.filterRpcs(registryRpcUrls, network.fromBlock);
-        customRpcUrls = await this.filterRpcs(customRpcUrls, network.fromBlock)
+        registryRpcUrls = await this.filterRpcs(registryRpcUrls, network.fromBlock, onlyIndexingRpcs);
+        customRpcUrls = await this.filterRpcs(customRpcUrls, network.fromBlock, onlyIndexingRpcs)
 
         let registryRpcClients = await this.getClients(registryRpcUrls, false);
         let customRpcClients = await this.getClients(customRpcUrls, true);
@@ -45,7 +42,7 @@ export class NetworkManager {
         let clients = await Promise.allSettled(
             rpcs.map(async (rpcUrl) => {
                 try {
-                    return await IndexerClient.create({ rpcUrl, priority });
+                    return await IndexerClient.createIndexer({ rpcUrl, priority });
                 } catch {
                     return Promise.reject();
                 }
@@ -55,7 +52,7 @@ export class NetworkManager {
         return clients.filter(isFulfilled).map(x => x.value);
     }
 
-    static async filterRpcs(urls: string[], fromBlock?: number): Promise<string[]> {
+    static async filterRpcs(urls: string[], fromBlock?: number, onlyIndexingRpcs?: boolean): Promise<string[]> {
         let result = await Promise.allSettled(urls.map(async (url) => {
             let response;
             try {
@@ -70,6 +67,12 @@ export class NetworkManager {
                 return Promise.reject(`${url} returned ${response.status} code`);
 
             let nodeEarliestBlock = Number(response?.data?.result?.sync_info?.earliest_block_height);
+            if (!nodeEarliestBlock)
+                return Promise.reject(`${url} returned incorrent status`);
+
+            let indexingDisabled = response?.data?.result?.node_info?.other?.tx_index === "off";
+            if (onlyIndexingRpcs && indexingDisabled) 
+                return Promise.reject(`${url} indexing disabled`);
 
             if (fromBlock && fromBlock < nodeEarliestBlock)
                 return Promise.reject(`${url} is alive, but does not have enough block history`);
@@ -81,15 +84,15 @@ export class NetworkManager {
         return result.filter(isFulfilled).map(x => x.value!);
     }
 
-    static async fetchChainsData(registryUrls: string[], chain: string): Promise<Chain> {
+    static async getChainRpcs(registryUrls: string[], chain: string): Promise<string[]> {
         for (let url of registryUrls) {
             try {
-                let response = await axios.get<Chain>( 
-                    `${url}/${chain}/chain.json`, 
-                    { timeout: 10000 }
+                let response = await axios.get<Chain>(
+                    `${url}/${chain}/chain.json`,
+                    { timeout: 2000 }
                 )
 
-                return response.data;
+                return response.data.apis?.rpc?.map(x => x.address)!;
             }
             catch (err: any) { console.warn(`fetchChainsData: ${err?.message}`) }
         }
@@ -98,10 +101,10 @@ export class NetworkManager {
         if (!result)
             throw new Error(`fetchChainsData: unknown chain ${chain}`)
 
-        return result;
+        return result.apis?.rpc?.map(x => x.address)!;
     }
 
-    getRpcs() : string[] {
+    getRpcs(): string[] {
         return this.clients.map(x => x.rpcUrl);
     }
 

@@ -24,13 +24,13 @@ export class ApiManager {
         let clients = this.manager.getClients();
 
         let results = await Promise.allSettled(
-            clients.map(client => client.getHeight())        
+            clients.map(client => client.getHeight())
         );
 
         let success = results.filter(isFulfilled).map(x => x.value) as number[];
         let result = Math.max(...success, lastKnownHeight);
 
-        if (lastKnownHeight > 0 && result === 0) 
+        if (lastKnownHeight > 0 && result === 0)
             throw new CantGetLatestHeightErr(this.manager.network, clients.map(x => x.rpcUrl));
 
         return result;
@@ -56,9 +56,9 @@ export class ApiManager {
 
         for (const client of clients) {
             try {
-                return await client.searchTx({ height })
+                return await client.searchTx(`tx.height=${height}`);
             } catch (err: any) {
-                let msg = `Error fetching indexed txs in ${this.manager.network} rpc ${client.rpcUrl} error : ${err?.message}`;
+                let msg = `Error fetching indexed txs in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;
                 console.log(new Error(msg));
             }
         }

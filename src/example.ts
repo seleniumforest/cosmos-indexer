@@ -8,10 +8,10 @@ import { BlocksWatcher } from "./blocksWatcher";
             name: "stargaze", 
             //RAW_TXS - txs without execution result, INDEXED_TXS - txs with eventlogs
             dataToFetch: "INDEXED_TXS",
-            //you can pass custom RPC, it will prioritize it over registry's rpcs
-            rpcUrls: [ ],
+            //you can pass custom RPC (which is on 26657 port), it will prioritize it over registry's rpcs
+            //rpcUrls: [ "your-rpc.com" ],
             //you can start from specific block, but be sure that there's at least one node stores data from this block
-            fromBlock: undefined
+            //fromBlock: undefined
         })
         //it will fetch from chain-registry 
         .useChainRegistryRpcs()

@@ -1,4 +1,4 @@
-import { Block, IndexedTx, SearchTxFilter, SearchTxQuery, StargateClient } from "@cosmjs/stargate";
+import { Block, IndexedTx, SearchTxQuery, StargateClient } from "@cosmjs/stargate";
 import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 
 export class IndexerClient extends StargateClient {
@@ -13,7 +13,7 @@ export class IndexerClient extends StargateClient {
         this.priority = opts.priority;
     }
 
-    static async create(opts: ClientOptions): Promise<IndexerClient> {
+    static async createIndexer(opts: ClientOptions): Promise<IndexerClient> {
         let client = await Tendermint34Client.connect(opts.rpcUrl);
         return new IndexerClient(client, opts);
     }
@@ -21,23 +21,23 @@ export class IndexerClient extends StargateClient {
     override async getBlock(height?: number | undefined): Promise<Block> {
         try {
             let block = await super.getBlock(height);
-            this.reportResult(true);
+            this.ok++;
 
             return block;
         } catch (err: any) {
-            this.reportResult(false);
+            this.fail++;
             return Promise.reject(err?.message)
         }
     }
 
-    override async searchTx(query: SearchTxQuery, filter?: SearchTxFilter | undefined): Promise<readonly IndexedTx[]> {
+    override async searchTx(query: SearchTxQuery): Promise<IndexedTx[]> {
         try {
-            let txs = await super.searchTx(query, filter);
-            this.reportResult(true);
+            let txs = await super.searchTx(query);
+            this.ok++;
 
             return txs;
         } catch (err: any) {
-            this.reportResult(false)
+            this.fail++;
             return Promise.reject(err?.message);
         }
     }
@@ -45,20 +45,13 @@ export class IndexerClient extends StargateClient {
     override async getHeight(): Promise<number> {
         try {
             let lastestHeight = await super.getHeight();
-            this.reportResult(true);
-            
+            this.ok++;
+
             return lastestHeight;
         } catch (err: any) {
-            this.reportResult(false);
+            this.fail++;
             return Promise.reject(err?.message);
         }
-    }
-
-    private reportResult(result: boolean): void {
-        if (result)
-            this.ok++;
-        else
-            this.fail++;
     }
 }
 
