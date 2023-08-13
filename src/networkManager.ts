@@ -4,6 +4,7 @@ import { Network } from "./blocksWatcher";
 import { defaultRegistryUrls, isFulfilled } from "./constants";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
+import { UnknownChainErr } from "./errors";
 
 export class NetworkManager {
     protected readonly minRequestsToTest: number = 20;
@@ -20,15 +21,15 @@ export class NetworkManager {
 
     static async create(
         network: Network,
-        registryUrls: string[] = defaultRegistryUrls,
         addChainRegistryRpcs: boolean = false
     ): Promise<NetworkManager> {
         let registryRpcUrls: string[] = [];
         let customRpcUrls = network.rpcUrls || [];
         let onlyIndexingRpcs = network.dataToFetch === "INDEXED_TXS";
-        if (addChainRegistryRpcs)
-            registryRpcUrls = await this.getChainRpcs(registryUrls, network.name);
-
+        if (addChainRegistryRpcs) {
+            let { rpc } = await this.getChainRpcs(network.name);
+            registryRpcUrls = rpc;
+        }
         registryRpcUrls = await this.filterRpcs(registryRpcUrls, network.fromBlock, onlyIndexingRpcs);
         customRpcUrls = await this.filterRpcs(customRpcUrls, network.fromBlock, onlyIndexingRpcs)
 
@@ -36,20 +37,6 @@ export class NetworkManager {
         let customRpcClients = await this.getClients(customRpcUrls, true);
 
         return new NetworkManager(network.name, registryRpcClients.concat(customRpcClients));
-    }
-
-    static async getClients(rpcs: string[], priority: boolean): Promise<IndexerClient[]> {
-        let clients = await Promise.allSettled(
-            rpcs.map(async (rpcUrl) => {
-                try {
-                    return await IndexerClient.createIndexer({ rpcUrl, priority });
-                } catch {
-                    return Promise.reject();
-                }
-            })
-        );
-
-        return clients.filter(isFulfilled).map(x => x.value);
     }
 
     static async filterRpcs(urls: string[], fromBlock?: number, onlyIndexingRpcs?: boolean): Promise<string[]> {
@@ -71,7 +58,7 @@ export class NetworkManager {
                 return Promise.reject(`${url} returned incorrent status`);
 
             let indexingDisabled = response?.data?.result?.node_info?.other?.tx_index === "off";
-            if (onlyIndexingRpcs && indexingDisabled) 
+            if (onlyIndexingRpcs && indexingDisabled)
                 return Promise.reject(`${url} indexing disabled`);
 
             if (fromBlock && fromBlock < nodeEarliestBlock)
@@ -84,31 +71,33 @@ export class NetworkManager {
         return result.filter(isFulfilled).map(x => x.value!);
     }
 
-    static async getChainRpcs(registryUrls: string[], chain: string): Promise<string[]> {
-        for (let url of registryUrls) {
-            try {
-                let response = await axios.get<Chain>(
-                    `${url}/${chain}/chain.json`,
-                    { timeout: 2000 }
-                )
+    public static async getChainRpcs(chain: string) {
+        let chainInfo = await this.getChainInfo(chain);
 
-                return response.data.apis?.rpc?.map(x => x.address)!;
-            }
-            catch (err: any) { console.warn(`fetchChainsData: ${err?.message}`) }
-        }
-
-        let result = chains.find(x => x.chain_name === chain);
-        if (!result)
-            throw new Error(`fetchChainsData: unknown chain ${chain}`)
-
-        return result.apis?.rpc?.map(x => x.address)!;
+        return {
+            rpc: chainInfo.apis?.rpc?.map(x => x.address)!,
+            rest: chainInfo.apis?.rest?.map(x => x.address)!
+        };
     }
 
-    getRpcs(): string[] {
-        return this.clients.map(x => x.rpcUrl);
+    getClients(ranked?: boolean): IndexerClient[] {
+        let customRpcExists = this.clients.filter(x => x.priority).length > 0;
+        if (customRpcExists && ranked === undefined)
+            return this.getUnrankedClients();
+        
+        if (ranked !== undefined) 
+            return ranked ? this.getRankedClients() : this.getUnrankedClients();
+
+        return this.getRankedClients();
     }
 
-    getClients(): IndexerClient[] {
+    private getUnrankedClients(): IndexerClient[] {
+        console.log("getUnrankedClients")
+        return this.clients.sort((a) => a.priority ? -1 : 1);
+    }
+
+    private getRankedClients(): IndexerClient[] {
+        console.log("getRankedClients")
         let result = this.clients
             .sort((a, b) => a.ok + a.fail > b.ok + b.fail ? 1 : -1);
 
@@ -131,5 +120,39 @@ export class NetworkManager {
 
             return (a.ok / (a.fail || 1)) > (b.ok / (b.fail || 1)) ? 1 : 0;
         });
+    }
+
+    private static async getClients(rpcs: string[], priority: boolean): Promise<IndexerClient[]> {
+        let clients = await Promise.allSettled(
+            rpcs.map(async (rpcUrl) => {
+                try {
+                    return await IndexerClient.createIndexer({ rpcUrl, priority });
+                } catch {
+                    return Promise.reject();
+                }
+            })
+        );
+
+        return clients.filter(isFulfilled).map(x => x.value);
+    }
+
+    private static async getChainInfo(chain: string) {
+        for (let url of defaultRegistryUrls) {
+            try {
+                let response = await axios.get<Chain>(
+                    `${url}/${chain}/chain.json`,
+                    { timeout: 2000 }
+                );
+
+                return response.data;
+            }
+            catch (err: any) { console.warn(`fetchChainsData: ${err?.message}`) }
+        }
+
+        let result = chains.find(x => x.chain_name === chain);
+        if (!result)
+            throw new UnknownChainErr(`fetchChainsData: unknown chain ${chain}`)
+
+        return result;
     }
 }

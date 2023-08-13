@@ -13,10 +13,9 @@ export class ApiManager {
 
     static async createApiManager(
         network: Network,
-        registryUrls: string[] = defaultRegistryUrls,
         useChainRegistryRpcs: boolean = false
     ) {
-        let networkManager = await NetworkManager.create(network, registryUrls, useChainRegistryRpcs);
+        let networkManager = await NetworkManager.create(network, useChainRegistryRpcs);
         return new ApiManager(networkManager);
     }
 

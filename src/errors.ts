@@ -21,3 +21,11 @@ export class CantGetBlockHeaderErr extends Error {
         super(message);
     }
 }
+
+export class UnknownChainErr extends Error {
+    constructor(chainName: string) {
+        let message = `Unknown chain ${chainName}`;
+        console.error(message);
+        super(message);
+    }
+}
