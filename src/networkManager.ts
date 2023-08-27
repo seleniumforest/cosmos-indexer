@@ -92,12 +92,10 @@ export class NetworkManager {
     }
 
     private getUnrankedClients(): IndexerClient[] {
-        console.log("getUnrankedClients")
         return this.clients.sort((a) => a.priority ? -1 : 1);
     }
 
     private getRankedClients(): IndexerClient[] {
-        console.log("getRankedClients")
         let result = this.clients
             .sort((a, b) => a.ok + a.fail > b.ok + b.fail ? 1 : -1);
 

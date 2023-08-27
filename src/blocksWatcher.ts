@@ -1,9 +1,8 @@
-import { defaultRegistryUrls } from './constants';
 import { ApiManager } from './apiManager';
 import { Block, IndexedTx } from '@cosmjs/stargate';
 import { Chain } from '@chain-registry/types';
 import { chains } from 'chain-registry';
-import { CantFindChainInfoErr } from './errors';
+import { UnknownChainErr } from './errors';
 
 export class BlocksWatcher {
     chains: Network[] = [];
@@ -61,7 +60,7 @@ export class BlocksWatcher {
                     await this.runNetwork(network);
                 } catch (e) {
                     //todo handle other types of errors
-                    if (e instanceof CantFindChainInfoErr) {
+                    if (e instanceof UnknownChainErr) {
                         return Promise.reject();
                     };
 
@@ -76,7 +75,7 @@ export class BlocksWatcher {
     async runNetwork(network: Network): Promise<void> {
         let chainData = chains.find(x => x.chain_name === network.name);
         if (!chainData) {
-            throw new CantFindChainInfoErr(network.name);
+            throw new UnknownChainErr(network.name);
         }
 
         let api = this.networks.get(network.name)!;
