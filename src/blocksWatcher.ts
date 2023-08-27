@@ -1,6 +1,9 @@
 import { defaultRegistryUrls } from './constants';
 import { ApiManager } from './apiManager';
 import { Block, IndexedTx } from '@cosmjs/stargate';
+import { Chain } from '@chain-registry/types';
+import { chains } from 'chain-registry';
+import { CantFindChainInfoErr } from './errors';
 
 export class BlocksWatcher {
     chains: Network[] = [];
@@ -60,7 +63,12 @@ export class BlocksWatcher {
                         console.log(`Running network ${network.name} from latest block`);
 
                     await this.runNetwork(network);
-                } catch {
+                } catch (e) {
+                    //todo handle other types of errors
+                    if (e instanceof CantFindChainInfoErr) {
+                        return Promise.reject();
+                    };
+
                     await new Promise(res => setTimeout(res, 30000));
                 }
             }
@@ -70,6 +78,11 @@ export class BlocksWatcher {
     }
 
     async runNetwork(network: Network): Promise<void> {
+        let chainData = chains.find(x => x.chain_name === network.name);
+        if (!chainData) {
+            throw new CantFindChainInfoErr(network.name);
+        }
+
         let api = this.networks.get(network.name)!;
         let nextHeight = network.fromBlock ? (network.fromBlock || 1) : 0;
         let skipGetLatestHeight = false;
@@ -131,7 +144,7 @@ export class BlocksWatcher {
                     break;
 
                 try {
-                    await this.onBlockRecievedCallback({ networkName: network.name }, block);
+                    await this.onBlockRecievedCallback({ chain: chainData }, block);
                     nextHeight++;
                 } catch (e: any) {
                     throw new Error("Error executing callback " + e?.message + "\n" + e?.stack)
@@ -142,9 +155,8 @@ export class BlocksWatcher {
             if (memoizedBlocks.size > this.maxBlocksInBatch * 2)
                 memoizedBlocks.clear();
 
-            if (!skipGetLatestHeight) {
+            if (!skipGetLatestHeight)
                 await new Promise(res => setTimeout(res, 5000));
-            }
         }
     }
 }
@@ -157,7 +169,7 @@ export interface Network {
 }
 
 export interface WatcherContext {
-    networkName: string
+    chain: Chain
 }
 
 export type DataToFetch = "RAW_TXS" | "INDEXED_TXS";

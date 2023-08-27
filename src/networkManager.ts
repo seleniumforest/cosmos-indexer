@@ -4,6 +4,7 @@ import { Network } from "./blocksWatcher";
 import { defaultRegistryUrls, isFulfilled } from "./constants";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
+import { CantFindChainInfoErr } from "./errors";
 
 export class NetworkManager {
     protected readonly minRequestsToTest: number = 20;
@@ -71,7 +72,7 @@ export class NetworkManager {
                 return Promise.reject(`${url} returned incorrent status`);
 
             let indexingDisabled = response?.data?.result?.node_info?.other?.tx_index === "off";
-            if (onlyIndexingRpcs && indexingDisabled) 
+            if (onlyIndexingRpcs && indexingDisabled)
                 return Promise.reject(`${url} indexing disabled`);
 
             if (fromBlock && fromBlock < nodeEarliestBlock)
@@ -84,22 +85,22 @@ export class NetworkManager {
         return result.filter(isFulfilled).map(x => x.value!);
     }
 
-    static async getChainRpcs(registryUrls: string[], chain: string): Promise<string[]> {
+    static async getChainRpcs(registryUrls: string[], chainName: string): Promise<string[]> {
         for (let url of registryUrls) {
             try {
                 let response = await axios.get<Chain>(
-                    `${url}/${chain}/chain.json`,
+                    `${url}/${chainName}/chain.json`,
                     { timeout: 2000 }
                 )
 
                 return response.data.apis?.rpc?.map(x => x.address)!;
             }
-            catch (err: any) { console.warn(`fetchChainsData: ${err?.message}`) }
+            catch (err: any) { console.error(`fetchChainsData: ${err?.message}`) }
         }
 
-        let result = chains.find(x => x.chain_name === chain);
+        let result = chains.find(x => x.chain_name === chainName);
         if (!result)
-            throw new Error(`fetchChainsData: unknown chain ${chain}`)
+            throw new CantFindChainInfoErr(chainName);
 
         return result.apis?.rpc?.map(x => x.address)!;
     }

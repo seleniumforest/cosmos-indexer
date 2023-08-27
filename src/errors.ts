@@ -21,3 +21,11 @@ export class CantGetBlockHeaderErr extends Error {
         super(message);
     }
 }
+
+export class CantFindChainInfoErr extends Error {
+    constructor(networkName: string) {
+        let message = `Chain data for ${networkName} not found`;
+        console.error(message);
+        super(message);
+    }
+}
