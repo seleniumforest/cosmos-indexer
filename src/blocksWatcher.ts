@@ -7,7 +7,6 @@ import { CantFindChainInfoErr } from './errors';
 
 export class BlocksWatcher {
     chains: Network[] = [];
-    registryUrls: string[] = [];
     networks: Map<string, ApiManager> = new Map();
     onBlockRecievedCallback: (ctx: WatcherContext, block: Block | IndexedBlock) => Promise<void> =
         () => Promise.reject("No onRecieve callback provided");
@@ -15,13 +14,11 @@ export class BlocksWatcher {
     fetchChainRegistryRpcs: boolean = false;
 
     //Builder section
-    private constructor(
-        registryUrls: string[] = defaultRegistryUrls) {
-        this.registryUrls = registryUrls;
+    private constructor() {
     }
 
-    static create(registryUrls: string[] = defaultRegistryUrls): BlocksWatcher {
-        let ind = new BlocksWatcher(registryUrls);
+    static create(): BlocksWatcher {
+        let ind = new BlocksWatcher();
         return ind;
     }
 
@@ -52,7 +49,6 @@ export class BlocksWatcher {
                 try {
                     let apiManager = await ApiManager.createApiManager(
                         network,
-                        this.registryUrls,
                         this.fetchChainRegistryRpcs
                     );
                     this.networks.set(network.name, apiManager);

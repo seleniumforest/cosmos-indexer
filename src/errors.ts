@@ -22,9 +22,9 @@ export class CantGetBlockHeaderErr extends Error {
     }
 }
 
-export class CantFindChainInfoErr extends Error {
-    constructor(networkName: string) {
-        let message = `Chain data for ${networkName} not found`;
+export class UnknownChainErr extends Error {
+    constructor(chainName: string) {
+        let message = `Unknown chain ${chainName}`;
         console.error(message);
         super(message);
     }
