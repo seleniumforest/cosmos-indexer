@@ -1,26 +1,26 @@
 import { Block, IndexedTx, SearchTxQuery, StargateClient } from "@cosmjs/stargate";
-import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 
-export class IndexerClient extends StargateClient {
+export class IndexerClient {
+    client: StargateClient;
     ok: number = 0;
     fail: number = 0;
     rpcUrl: string = "";
     priority: boolean = false;
 
-    private constructor(client: Tendermint34Client, opts: ClientOptions) {
-        super(client, {});
+    private constructor(client: StargateClient, opts: ClientOptions) {
         this.rpcUrl = opts.rpcUrl;
         this.priority = opts.priority;
+        this.client = client;
     }
 
     static async createIndexer(opts: ClientOptions): Promise<IndexerClient> {
-        let client = await Tendermint34Client.connect(opts.rpcUrl);
+        let client = await StargateClient.connect(opts.rpcUrl);
         return new IndexerClient(client, opts);
     }
 
-    override async getBlock(height?: number | undefined): Promise<Block> {
+    async getBlock(height?: number | undefined): Promise<Block> {
         try {
-            let block = await super.getBlock(height);
+            let block = await this.client.getBlock(height);
             this.ok++;
 
             return block;
@@ -30,9 +30,9 @@ export class IndexerClient extends StargateClient {
         }
     }
 
-    override async searchTx(query: SearchTxQuery): Promise<IndexedTx[]> {
+    async searchTx(query: SearchTxQuery): Promise<IndexedTx[]> {
         try {
-            let txs = await super.searchTx(query);
+            let txs = await this.client.searchTx(query);
             this.ok++;
 
             return txs;
@@ -42,9 +42,9 @@ export class IndexerClient extends StargateClient {
         }
     }
 
-    override async getHeight(): Promise<number> {
+    async getHeight(): Promise<number> {
         try {
-            let lastestHeight = await super.getHeight();
+            let lastestHeight = await this.client.getHeight();
             this.ok++;
 
             return lastestHeight;

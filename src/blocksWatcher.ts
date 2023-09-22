@@ -50,13 +50,8 @@ export class BlocksWatcher {
                         network,
                         this.fetchChainRegistryRpcs
                     );
+
                     this.networks.set(network.name, apiManager);
-
-                    if (network.fromBlock)
-                        console.log(`Running network ${network.name} from block ${network.fromBlock}`);
-                    else
-                        console.log(`Running network ${network.name} from latest block`);
-
                     await this.runNetwork(network);
                 } catch (e) {
                     //todo handle other types of errors
@@ -112,9 +107,17 @@ export class BlocksWatcher {
             }
         }
 
+        let firstLoop = true
         while (true) {
-            if (!skipGetLatestHeight)
+            if (firstLoop && network.fromBlock)
+                console.log(`Running network ${network.name} from block ${network.fromBlock}`);
+
+            if (!skipGetLatestHeight) {
                 latestHeight = await api.fetchLatestHeight(nextHeight);
+
+                console.log(`Latest network height is ${latestHeight}`);
+                firstLoop = false;
+            }
 
             //no new block commited into network
             if (nextHeight == latestHeight) {

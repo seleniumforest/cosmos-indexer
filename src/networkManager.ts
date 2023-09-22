@@ -16,6 +16,7 @@ export class NetworkManager {
 
         if (clients.length === 0)
             console.log("No rpcs found");
+
         this.clients = clients;
     }
 
@@ -23,19 +24,25 @@ export class NetworkManager {
         network: Network,
         addChainRegistryRpcs: boolean = false
     ): Promise<NetworkManager> {
+        console.log(`Initializing ${network.name} RPCs:`);
+        console.group();
         let registryRpcUrls: string[] = [];
         let customRpcUrls = network.rpcUrls || [];
         let onlyIndexingRpcs = network.dataToFetch === "INDEXED_TXS";
         if (addChainRegistryRpcs) {
+            console.log(`Searching RPCs for ${network.name} in chain registry...`);
             let { rpc } = await this.getChainRpcs(network.name);
             registryRpcUrls = rpc;
         }
+
+        console.log(`Filtering chain registry ${network.name} RPCs...`);
         registryRpcUrls = await this.filterRpcs(registryRpcUrls, network.fromBlock, onlyIndexingRpcs);
         customRpcUrls = await this.filterRpcs(customRpcUrls, network.fromBlock, onlyIndexingRpcs)
 
+        console.log("Connecting to RPCs...");
         let registryRpcClients = await this.getClients(registryRpcUrls, false);
         let customRpcClients = await this.getClients(customRpcUrls, true);
-
+        console.groupEnd();
         return new NetworkManager(network.name, registryRpcClients.concat(customRpcClients));
     }
 
@@ -84,8 +91,8 @@ export class NetworkManager {
         let customRpcExists = this.clients.filter(x => x.priority).length > 0;
         if (customRpcExists && ranked === undefined)
             return this.getUnrankedClients();
-        
-        if (ranked !== undefined) 
+
+        if (ranked !== undefined)
             return ranked ? this.getRankedClients() : this.getUnrankedClients();
 
         return this.getRankedClients();

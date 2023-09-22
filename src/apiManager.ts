@@ -16,6 +16,7 @@ export class ApiManager {
         useChainRegistryRpcs: boolean = false
     ) {
         let networkManager = await NetworkManager.create(network, useChainRegistryRpcs);
+        console.log(`Network ${network.name} endpoint set ${networkManager.getClients().map(x => x.rpcUrl)}`)
         return new ApiManager(networkManager);
     }
 
