@@ -97,6 +97,7 @@ export class BlocksWatcher {
 
         let composeBlock = async (height: number): Promise<Block | IndexedBlock> => {
             let block = await api.fetchBlock(height);
+            let isEmptyBlock = block.txs.length === 0;
 
             switch (network.dataToFetch) {
                 case "RAW_TXS":
@@ -104,7 +105,7 @@ export class BlocksWatcher {
                 case "INDEXED_TXS":
                     return {
                         ...block,
-                        txs: await api.fetchIndexedTxs(height)
+                        txs: isEmptyBlock ? [] : await api.fetchIndexedTxs(height)
                     } as IndexedBlock
                 default:
                     return block
