@@ -11,7 +11,7 @@ Iterates blocks from given height. Takes every block and transaction, and passes
 ## Usage
 
 NPM package soon, now use 
-```npm install https://github.com/seleniumforest/cosmos-indexer#0.2.0``` 
+```npm install https://github.com/seleniumforest/cosmos-indexer``` 
 to install
 
 See  ```src/example.ts```
