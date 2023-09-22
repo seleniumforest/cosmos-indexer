@@ -46,7 +46,12 @@ export class NetworkManager {
         return new NetworkManager(network.name, registryRpcClients.concat(customRpcClients));
     }
 
-    static async filterRpcs(urls: string[], fromBlock?: number, onlyIndexingRpcs?: boolean): Promise<string[]> {
+    static async filterRpcs(
+        urls: string[],
+        fromBlock?: number,
+        onlyIndexingRpcs?: boolean,
+        syncWindow?: number //difference between latest block and now, in milliseconds
+    ): Promise<string[]> {
         let result = await Promise.allSettled(urls.map(async (url) => {
             let response;
             try {
@@ -71,7 +76,12 @@ export class NetworkManager {
             if (fromBlock && fromBlock < nodeEarliestBlock)
                 return Promise.reject(`${url} is alive, but does not have enough block history`);
 
+            let nodeLatestBlockTime = Date.parse(response?.data?.result?.sync_info?.latest_block_time);
+            if (syncWindow && syncWindow > 0 && (Date.now() - nodeLatestBlockTime > syncWindow))
+                return Promise.reject(`${url} is alive, but has not fully synced`);
+
             return Promise.resolve(url);
+
         }));
 
         //result.forEach(rpc => console.log(isFulfilled(rpc) ? rpc.value + " is alive" : rpc.reason));
