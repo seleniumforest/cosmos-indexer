@@ -22,7 +22,8 @@ export class NetworkManager {
 
     static async create(
         network: Network,
-        addChainRegistryRpcs: boolean = false
+        addChainRegistryRpcs: boolean = false,
+        syncWindow: number = 0
     ): Promise<NetworkManager> {
         console.log(`Initializing ${network.name} RPCs:`);
         console.group();
@@ -36,8 +37,8 @@ export class NetworkManager {
         }
 
         console.log(`Filtering chain registry ${network.name} RPCs...`);
-        registryRpcUrls = await this.filterRpcs(registryRpcUrls, network.fromBlock, onlyIndexingRpcs);
-        customRpcUrls = await this.filterRpcs(customRpcUrls, network.fromBlock, onlyIndexingRpcs)
+        registryRpcUrls = await this.filterRpcs(registryRpcUrls, network.fromBlock, onlyIndexingRpcs, syncWindow);
+        customRpcUrls = await this.filterRpcs(customRpcUrls, network.fromBlock, onlyIndexingRpcs, syncWindow)
 
         console.log("Connecting to RPCs...");
         let registryRpcClients = await this.getClients(registryRpcUrls, false);
