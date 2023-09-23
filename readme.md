@@ -24,6 +24,7 @@ See  ```src/example.ts```
 2. Divide code to low coupled modules
 3. Make advanced balancer or integrate 3rd party
 4. Work with typings for Indexed/Raw blocks
+5. Fix fetching indexed txs in large blocks, see TODO in BlocksWatcher.runNetwork.composeBlock
 
 ### Features
 

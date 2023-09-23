@@ -92,6 +92,8 @@ export class BlocksWatcher {
 
         let composeBlock = async (height: number): Promise<Block | IndexedBlock> => {
             let block = await api.fetchBlock(height);
+            
+            //TODO FIX it doesn't work with large blocks, fetchIndexedTxs returns [], see terra1 block 4751186
             let isEmptyBlock = block.txs.length === 0;
 
             switch (network.dataToFetch) {
