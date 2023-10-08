@@ -92,14 +92,13 @@ export class BlocksWatcher {
 
         let composeBlock = async (height: number): Promise<Block | IndexedBlock> => {
             let block = await api.fetchBlock(height);
-            
-            //TODO FIX it doesn't work with large blocks, fetchIndexedTxs returns [], see terra1 block 4751186
-            let isEmptyBlock = block.txs.length === 0;
 
             switch (network.dataToFetch) {
                 case "RAW_TXS":
                     return block;
                 case "INDEXED_TXS":
+                    let isEmptyBlock = block.txs.length === 0;
+
                     return {
                         ...block,
                         txs: isEmptyBlock ? [] : await api.fetchIndexedTxs(height)
@@ -117,7 +116,8 @@ export class BlocksWatcher {
             if (!skipGetLatestHeight) {
                 latestHeight = await api.fetchLatestHeight(nextHeight);
 
-                console.log(`Latest network height is ${latestHeight}`);
+                if (firstLoop)
+                    console.log(`Latest network height is ${latestHeight}`);
                 firstLoop = false;
             }
 
