@@ -1,5 +1,5 @@
 # Indexer for Cosmos SDK based blockchains
-Iterates blocks from given height. Takes every block and transaction, and passes it to your handler. Works with multiple RPCs from chain-registry, balancing between them.
+Iterates blocks from given height and catches up latest blocks. Takes every block and transaction, and passes it to your handler. Works with multiple RPCs from chain-registry, balancing between them, or with your own RPC. Optionally, caches blocks into your db to reindex data faster.
 
 ## Usecases
 
@@ -20,15 +20,14 @@ See  ```src/example.ts```
 
 ### Code
 
-1. Handle Errors
+1. Better error handling
 2. Divide code to low coupled modules
 3. Make advanced balancer or integrate 3rd party
 4. Work with typings for Indexed/Raw blocks
 
 ### Features
 
-1. Module to integrate new blockchains
-2. Use dependabot to update chain-registry package more frequently
-3. Add chain-registry data hot refresh every day
-4. Feature to expose rest urls for calling other API methods (or we can pass them throgh ctx???)
-
+1. Use dependabot to update chain-registry package more frequently
+2. Feature to expose rest urls for calling other API methods (or we can pass them throgh ctx???)
+3. Make configs for production build/pm2
+4. Default handlers for basic events (msgsend, msgdelegate, msgvote etc.), should be extendable for any chain.
