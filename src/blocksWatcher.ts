@@ -3,6 +3,10 @@ import { Block, IndexedTx } from '@cosmjs/stargate';
 import { Chain } from '@chain-registry/types';
 import { chains } from 'chain-registry';
 import { UnknownChainErr } from './errors';
+import assert from 'assert';
+import { DataSource, DataSourceOptions } from 'typeorm';
+import { IndexerStorage, CachedTxs, CachedBlock } from './storage';
+import { isRejected } from './constants';
 
 export class BlocksWatcher {
     chains: Network[] = [];
@@ -10,7 +14,8 @@ export class BlocksWatcher {
     onBlockRecievedCallback: (ctx: WatcherContext, block: Block | IndexedBlock) => Promise<void> =
         () => Promise.reject("No onRecieve callback provided");
     maxBlocksInBatch: number = 1;
-    fetchChainRegistryRpcs: boolean = false;
+    fetchChainRegistryRpcs: boolean;
+    cacheSource?: DataSource;
 
     //Builder section
     private constructor() {
@@ -21,18 +26,28 @@ export class BlocksWatcher {
         return ind;
     }
 
-    addNetwork(network: Network) {
+    useNetwork(network: Network) {
         this.chains.push(network);
         return this;
     }
 
     useBatchFetching(maxBlocks: number) {
+        assert(maxBlocks > 0, "Wrong maxBlocks number");
         this.maxBlocksInBatch = maxBlocks;
         return this;
     }
 
     useChainRegistryRpcs() {
         this.fetchChainRegistryRpcs = true;
+        return this;
+    }
+
+    useBlockCache(opts: DataSourceOptions) {
+        this.cacheSource = new DataSource({
+            ...opts,
+            entities: [CachedBlock, CachedTxs]
+        })
+
         return this;
     }
 
@@ -43,11 +58,17 @@ export class BlocksWatcher {
 
     //Execution section
     async run(): Promise<void> {
-        let chainWorkers = this.chains.map(async (network) => {
+        if (this.cacheSource) {
+            console.log(`Initializing DB...`);
+            await this.cacheSource.initialize();
+        }
+
+        let chainWorkerDelegate = async (network: Network) => {
             while (true) {
                 try {
                     let apiManager = await ApiManager.createApiManager(
                         network,
+                        new IndexerStorage(this.cacheSource),
                         this.fetchChainRegistryRpcs
                     );
 
@@ -62,8 +83,9 @@ export class BlocksWatcher {
                     await new Promise(res => setTimeout(res, 30000));
                 }
             }
-        });
+        }
 
+        let chainWorkers = this.chains.map(chainWorkerDelegate);
         await Promise.allSettled(chainWorkers);
     }
 
@@ -77,16 +99,16 @@ export class BlocksWatcher {
         let nextHeight = network.fromBlock ? (network.fromBlock || 1) : 0;
         let skipGetLatestHeight = false;
         let latestHeight: number = -1;
-        let memoizedBlocks: Map<number, Block | IndexedBlock> =
+        let memoizedBatchBlocks: Map<number, Block | IndexedBlock> =
             new Map<number, Block | IndexedBlock>();
 
         let getBlock = async (height: number) => {
-            let memo = memoizedBlocks.get(height);
+            let memo = memoizedBatchBlocks.get(height);
             if (memo)
                 return memo;
 
             let composed = await composeBlock(height);
-            memoizedBlocks.set(composed.header.height, composed);
+            memoizedBatchBlocks.set(composed.header.height, composed);
             return composed;
         }
 
@@ -136,6 +158,12 @@ export class BlocksWatcher {
                 targetBlocks.map(async (num) => await getBlock(num))
             );
 
+            blockResults
+                .filter(isRejected)
+                .forEach(x =>
+                    console.warn(`targetBlocks ${targetBlocks.at(0)}-${targetBlocks.at(-1)} rejection reason: ${x.reason}`)
+                )
+
             let blocks = blockResults
                 .map(b => (b as PromiseFulfilledResult<Block>)?.value)
                 .sort((a, b) => a.header.height > b.header.height ? 1 : -1);
@@ -153,8 +181,8 @@ export class BlocksWatcher {
             }
 
             skipGetLatestHeight = nextHeight < latestHeight;
-            if (memoizedBlocks.size > this.maxBlocksInBatch * 2)
-                memoizedBlocks.clear();
+            if (memoizedBatchBlocks.size > this.maxBlocksInBatch * 2)
+                memoizedBatchBlocks.clear();
 
             if (!skipGetLatestHeight)
                 await new Promise(res => setTimeout(res, 5000));

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
-import { defaultRegistryUrls, isFulfilled } from "./constants";
+import { isFulfilled } from "./constants";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
 import { UnknownChainErr } from "./errors";
@@ -26,7 +26,6 @@ export class NetworkManager {
         syncWindow: number = 0
     ): Promise<NetworkManager> {
         console.log(`Initializing ${network.name} RPCs:`);
-        console.group();
         let registryRpcUrls: string[] = [];
         let customRpcUrls = network.rpcUrls || [];
         let onlyIndexingRpcs = network.dataToFetch === "INDEXED_TXS";
@@ -43,7 +42,7 @@ export class NetworkManager {
         console.log("Connecting to RPCs...");
         let registryRpcClients = await this.getClients(registryRpcUrls, false);
         let customRpcClients = await this.getClients(customRpcUrls, true);
-        console.groupEnd();
+
         return new NetworkManager(network.name, registryRpcClients.concat(customRpcClients));
     }
 
@@ -153,21 +152,19 @@ export class NetworkManager {
     }
 
     private static async getChainInfo(chain: string) {
-        for (let url of defaultRegistryUrls) {
-            try {
-                let response = await axios.get<Chain>(
-                    `${url}/${chain}/chain.json`,
-                    { timeout: 2000 }
-                );
+        try {
+            let githubResponse = await axios.get<Chain>(
+                `https://raw.githubusercontent.com/cosmos/chain-registry/master/${chain}/chain.json`
+            );
 
-                return response.data;
-            }
-            catch (err: any) { console.warn(`fetchChainsData: ${err?.message}`) }
+            return githubResponse.data;
+        } catch (e) {
+            console.warn(`Coudn't fetch latest chains info`);
         }
 
         let result = chains.find(x => x.chain_name === chain);
         if (!result)
-            throw new UnknownChainErr(`fetchChainsData: unknown chain ${chain}`)
+            throw new UnknownChainErr(chain);
 
         return result;
     }
