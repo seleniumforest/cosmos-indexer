@@ -7,3 +7,6 @@ export * from "./apiManager";
 export {
     NetworkManager
 }
+export { Chain } from '@chain-registry/types';
+export { Block } from '@cosmjs/stargate';
+export { IndexedBlock } from "./blocksWatcher";
