@@ -5,6 +5,11 @@ import { isFulfilled } from "./constants";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
 import { UnknownChainErr } from "./errors";
+import { setupCache } from "axios-cache-interceptor";
+
+const axiosCached = setupCache(axios, {
+    ttl: 1000 * 60 * 60
+});
 
 export class NetworkManager {
     protected readonly minRequestsToTest: number = 20;
@@ -45,6 +50,7 @@ export class NetworkManager {
 
         return new NetworkManager(network.name, registryRpcClients.concat(customRpcClients));
     }
+
 
     static async filterRpcs(
         urls: string[],
@@ -151,15 +157,15 @@ export class NetworkManager {
         return clients.filter(isFulfilled).map(x => x.value);
     }
 
-    private static async getChainInfo(chain: string) {
+    static async getChainInfo(chain: string) {
         try {
-            let githubResponse = await axios.get<Chain>(
+            let githubResponse = await axiosCached.get<Chain>(
                 `https://raw.githubusercontent.com/cosmos/chain-registry/master/${chain}/chain.json`
             );
 
             return githubResponse.data;
         } catch (e) {
-            console.warn(`Coudn't fetch latest chains info`);
+            console.warn(`Coudn't fetch latest chains info from Github`);
         }
 
         let result = chains.find(x => x.chain_name === chain);
