@@ -1,5 +1,5 @@
 import { NetworkManager } from "./networkManager";
-import { isFulfilled } from "./constants";
+import { awaitWithTimeout, isFulfilled } from "./helpers";
 import { CantGetBlockHeaderErr, CantGetLatestHeightErr } from "./errors";
 import { Network } from "./blocksWatcher";
 import { Block, IndexedTx } from "@cosmjs/stargate";
@@ -28,7 +28,7 @@ export class ApiManager {
         let clients = this.manager.getClients();
 
         let results = await Promise.allSettled(
-            clients.map(client => client.getHeight())
+            clients.map(client => awaitWithTimeout(client.getHeight(), 10000))
         );
 
         let success = results.filter(isFulfilled).map(x => x.value) as number[];
@@ -48,10 +48,10 @@ export class ApiManager {
         let response;
         for (const client of clients) {
             try {
-                response = await client.getBlock(height);
+                response = await awaitWithTimeout(client.getBlock(height), 10000);
                 break;
             } catch (err: any) {
-                let msg = `Error fetching block header in ${this.manager.network} rpc ${client.rpcUrl} error : ${err?.message}`;
+                let msg = `Error fetching block header in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;
                 console.warn(new Error(msg));
             }
         };
@@ -72,7 +72,7 @@ export class ApiManager {
         let response;
         for (const client of clients) {
             try {
-                response = await client.searchTx(`tx.height=${height}`);
+                response = await awaitWithTimeout(client.searchTx(`tx.height=${height}`), 10000);
                 break;
             } catch (err: any) {
                 let msg = `Error fetching indexed txs in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;

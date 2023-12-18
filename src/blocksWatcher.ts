@@ -6,7 +6,7 @@ import { UnknownChainErr } from './errors';
 import assert from 'assert';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { IndexerStorage, CachedTxs, CachedBlock } from './storage';
-import { isRejected } from './constants';
+import { isRejected } from './helpers';
 
 export class BlocksWatcher {
     chains: Network[] = [];

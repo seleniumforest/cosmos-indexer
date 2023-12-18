@@ -1,11 +1,13 @@
 import axios from "axios";
 import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
-import { isFulfilled } from "./constants";
+import { awaitWithTimeout, isFulfilled } from "./helpers";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
 import { UnknownChainErr } from "./errors";
 import { setupCache } from "axios-cache-interceptor";
+import { connectComet } from "@cosmjs/tendermint-rpc";
+import { StatusResponse } from "@cosmjs/tendermint-rpc/build/comet38";
 
 const axiosCached = setupCache(axios, {
     ttl: 1000 * 60 * 60
@@ -58,37 +60,36 @@ export class NetworkManager {
         onlyIndexingRpcs?: boolean,
         syncWindow?: number //difference between latest block and now, in milliseconds
     ): Promise<string[]> {
-        let result = await Promise.allSettled(urls.map(async (url) => {
-            let response;
+        let handler = async (url: string) => {
+            let status: StatusResponse;
             try {
-                response = await axios({
-                    method: "GET",
-                    url: `${url}/status`,
-                    timeout: 5000
-                });
-            } catch (_) { return Promise.reject(`${url} is dead`); }
+                let client = await connectComet(url);
+                status = await client.status();
+            } catch (err: any) {
+                return Promise.reject(`${url} is dead error ${err}`);
+            }
 
-            if (!response || response.status !== 200)
-                return Promise.reject(`${url} returned ${response.status} code`);
-
-            let nodeEarliestBlock = Number(response?.data?.result?.sync_info?.earliest_block_height);
+            let nodeEarliestBlock = status.syncInfo.earliestBlockHeight;
             if (!nodeEarliestBlock)
-                return Promise.reject(`${url} returned incorrent status`);
+                return Promise.reject(`${url} returned incorrent earliestBlockHeight`);
 
-            let indexingDisabled = response?.data?.result?.node_info?.other?.tx_index === "off";
+            let indexingDisabled = status.nodeInfo.other.get("tx_index") === "off";
             if (onlyIndexingRpcs && indexingDisabled)
                 return Promise.reject(`${url} indexing disabled`);
 
             if (fromBlock && fromBlock < nodeEarliestBlock)
                 return Promise.reject(`${url} is alive, but does not have enough block history`);
 
-            let nodeLatestBlockTime = Date.parse(response?.data?.result?.sync_info?.latest_block_time);
-            if (syncWindow && syncWindow > 0 && (Date.now() - nodeLatestBlockTime > syncWindow))
+            let nodeLatestBlockTime = status.syncInfo.latestBlockTime;
+            if (syncWindow && syncWindow > 0 && (Date.now() - nodeLatestBlockTime.getDate() > syncWindow))
                 return Promise.reject(`${url} is alive, but has not fully synced`);
 
             return Promise.resolve(url);
+        }
 
-        }));
+        let handlerWithTimeout = (url: string) => awaitWithTimeout(handler(url), 10000);
+
+        let result = await Promise.allSettled(urls.map(url => handlerWithTimeout(url)));
 
         //result.forEach(rpc => console.log(isFulfilled(rpc) ? rpc.value + " is alive" : rpc.reason));
         return result.filter(isFulfilled).map(x => x.value!);
