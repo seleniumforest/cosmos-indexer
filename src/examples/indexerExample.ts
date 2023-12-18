@@ -1,5 +1,5 @@
 import { IndexedTx } from "@cosmjs/stargate";
-import { BlocksWatcher } from "./blocksWatcher";
+import { BlocksWatcher } from "../blocksWatcher";
 
 (async () => {
     await BlocksWatcher

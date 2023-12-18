@@ -304,16 +304,7 @@ asynckit@^0.4.0:
   resolved "https://registry.npmjs.org/asynckit/-/asynckit-0.4.0.tgz"
   integrity sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==
 
-axios-cache-interceptor@1.3.3:
-  version "1.3.3"
-  resolved "https://registry.yarnpkg.com/axios-cache-interceptor/-/axios-cache-interceptor-1.3.3.tgz#b95a00e298ea580d78deca2c3f5ce4663b17e673"
-  integrity sha512-i+AU7qIf3trytWR8KmQpGbNm47T9OllnM3j/jtbybG2CN0eSmPL7Szo0VzJZPtuoKXVINvRozieXDLCUREW5kw==
-  dependencies:
-    cache-parser "1.2.4"
-    fast-defer "1.1.8"
-    object-code "1.3.2"
-
-axios@1.6.2, axios@^1.6.0:
+axios@^1.6.0:
   version "1.6.2"
   resolved "https://registry.yarnpkg.com/axios/-/axios-1.6.2.tgz#de67d42c755b571d3e698df1b6504cde9b0ee9f2"
   integrity sha512-7i24Ri4pmDRfJTR7LDBhsOTtcm+9kjX5WiY1X3wIisx6G9So3pfMkEiU7emUBe46oceVImccTEM3k6C5dbVW8A==
@@ -371,11 +362,6 @@ buffer@^6.0.3:
   dependencies:
     base64-js "^1.3.1"
     ieee754 "^1.2.1"
-
-cache-parser@1.2.4:
-  version "1.2.4"
-  resolved "https://registry.yarnpkg.com/cache-parser/-/cache-parser-1.2.4.tgz#60975135ef2330e6a1d60895279d7237a2a9b398"
-  integrity sha512-O0KwuHuJnbHUrghHi2kGp0SxnWSIBXTYt7M8WVhW0kbPRUNUKoE/Of6e1rRD6AAxmfxFunKnt90yEK09D+sc5g==
 
 chain-registry@1.24.1:
   version "1.24.1"
@@ -511,11 +497,6 @@ escalade@^3.1.1:
   version "3.1.1"
   resolved "https://registry.yarnpkg.com/escalade/-/escalade-3.1.1.tgz#d8cfdc7000965c5a0174b4a82eaa5c0552742e40"
   integrity sha512-k0er2gUkLf8O0zKJiAhmkTnJlTvINGv7ygDNPbeIsX/TJjGJZHuh9B2UxbsaEkmlEo9MfhrSzmhIlhRlI2GXnw==
-
-fast-defer@1.1.8:
-  version "1.1.8"
-  resolved "https://registry.yarnpkg.com/fast-defer/-/fast-defer-1.1.8.tgz#940ef9597b2ea51c4cd08e99d0f2a8978fa49ba2"
-  integrity sha512-lEJeOH5VL5R09j6AA0D4Uvq7AgsHw0dAImQQ+F3iSyHZuAxyQfWobsagGpTcOPvJr3urmKRHrs+Gs9hV+/Qm/Q==
 
 follow-redirects@^1.15.0:
   version "1.15.3"
@@ -721,11 +702,6 @@ object-assign@^4.0.1:
   version "4.1.1"
   resolved "https://registry.yarnpkg.com/object-assign/-/object-assign-4.1.1.tgz#2109adc7965887cfc05cbbd442cac8bfbb360863"
   integrity sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==
-
-object-code@1.3.2:
-  version "1.3.2"
-  resolved "https://registry.yarnpkg.com/object-code/-/object-code-1.3.2.tgz#f0c0fd71b16aed45a58c306b831f2249806dffd5"
-  integrity sha512-3CVDmQiru7YYVr+4OpCGrqkVE7GogmWinDcgfno1fXlKgIhtW9FhgHTiV98gMPUjQwWuWvijQDCY8sGnqKrhTw==
 
 object-keys@^1.1.1:
   version "1.1.1"

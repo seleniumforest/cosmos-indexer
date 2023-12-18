@@ -1,22 +1,17 @@
-import axios from "axios";
 import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
 import { awaitWithTimeout, isFulfilled } from "./helpers";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
 import { UnknownChainErr } from "./errors";
-import { setupCache } from "axios-cache-interceptor";
 import { connectComet } from "@cosmjs/tendermint-rpc";
 import { StatusResponse } from "@cosmjs/tendermint-rpc/build/comet38";
-
-const axiosCached = setupCache(axios, {
-    ttl: 1000 * 60 * 60
-});
 
 export class NetworkManager {
     protected readonly minRequestsToTest: number = 20;
     readonly network: string = "";
     protected clients: IndexerClient[] = [];
+    static readonly chainInfoCache = new Map<string, { timestamp: number, chain: Chain }>();
 
     protected constructor(network: string, clients: IndexerClient[]) {
         this.network = network;
@@ -159,12 +154,17 @@ export class NetworkManager {
     }
 
     static async getChainInfo(chain: string) {
+        let cached = this.chainInfoCache.get(chain);
+        if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 12) {
+            console.log("cached")
+            return cached.chain;
+        }
         try {
-            let githubResponse = await axiosCached.get<Chain>(
-                `https://raw.githubusercontent.com/cosmos/chain-registry/master/${chain}/chain.json`
-            );
-
-            return githubResponse.data;
+            let resp = await fetch(`https://raw.githubusercontent.com/cosmos/chain-registry/master/${chain}/chain.json`);
+            let githubResponse = await resp.json() as Chain;
+            console.log("fetched")
+            this.chainInfoCache.set(chain, { timestamp: Date.now(), chain: githubResponse });
+            return githubResponse;
         } catch (e) {
             console.warn(`Coudn't fetch latest chains info from Github`);
         }
