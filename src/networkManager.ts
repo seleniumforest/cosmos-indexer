@@ -156,13 +156,12 @@ export class NetworkManager {
     static async getChainInfo(chain: string) {
         let cached = this.chainInfoCache.get(chain);
         if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 12) {
-            console.log("cached")
             return cached.chain;
         }
+
         try {
             let resp = await fetch(`https://raw.githubusercontent.com/cosmos/chain-registry/master/${chain}/chain.json`);
             let githubResponse = await resp.json() as Chain;
-            console.log("fetched")
             this.chainInfoCache.set(chain, { timestamp: Date.now(), chain: githubResponse });
             return githubResponse;
         } catch (e) {
