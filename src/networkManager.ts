@@ -12,6 +12,7 @@ export class NetworkManager {
     readonly network: string = "";
     protected clients: IndexerClient[] = [];
     static readonly chainInfoCache = new Map<string, { timestamp: number, chain: Chain }>();
+    static readonly defaultSyncWindow = 1000 * 100; // 100s
 
     protected constructor(network: string, clients: IndexerClient[]) {
         this.network = network;
@@ -25,7 +26,7 @@ export class NetworkManager {
     static async create(
         network: Network,
         addChainRegistryRpcs: boolean = false,
-        syncWindow: number = 0
+        syncWindow: number = this.defaultSyncWindow
     ): Promise<NetworkManager> {
         console.log(`Initializing ${network.name} RPCs:`);
         let registryRpcUrls: string[] = [];
@@ -37,11 +38,10 @@ export class NetworkManager {
             registryRpcUrls = rpc;
         }
 
-        console.log(`Filtering chain registry ${network.name} RPCs...`);
-        registryRpcUrls = await this.filterRpcs(registryRpcUrls, network.fromBlock, onlyIndexingRpcs, syncWindow);
-        customRpcUrls = await this.filterRpcs(customRpcUrls, network.fromBlock, onlyIndexingRpcs, syncWindow)
+        console.log(`Checking ${network.name} RPCs...`);
+        registryRpcUrls = await this.filterRpcs(network, registryRpcUrls, onlyIndexingRpcs, syncWindow);
+        customRpcUrls = await this.filterRpcs(network, customRpcUrls, onlyIndexingRpcs, syncWindow)
 
-        console.log("Connecting to RPCs...");
         let registryRpcClients = await this.getClients(registryRpcUrls, false);
         let customRpcClients = await this.getClients(customRpcUrls, true);
 
@@ -50,10 +50,10 @@ export class NetworkManager {
 
 
     static async filterRpcs(
+        network: Network,
         urls: string[],
-        fromBlock?: number,
         onlyIndexingRpcs?: boolean,
-        syncWindow?: number //difference between latest block and now, in milliseconds
+        syncWindow?: number //difference between latest block and now, in seconds
     ): Promise<string[]> {
         let handler = async (url: string) => {
             let status: StatusResponse;
@@ -61,32 +61,40 @@ export class NetworkManager {
                 let client = await connectComet(url);
                 status = await client.status();
             } catch (err: any) {
-                return Promise.reject(`${url} is dead error ${err}`);
+                return Promise.reject(`${url} is dead : ${err}`);
             }
 
             let nodeEarliestBlock = status.syncInfo.earliestBlockHeight;
             if (!nodeEarliestBlock)
-                return Promise.reject(`${url} returned incorrent earliestBlockHeight`);
+                return Promise.reject(`${url} : returned incorrent earliestBlockHeight`);
 
             let indexingDisabled = status.nodeInfo.other.get("tx_index") === "off";
             if (onlyIndexingRpcs && indexingDisabled)
-                return Promise.reject(`${url} indexing disabled`);
+                return Promise.reject(`${url} : indexing disabled`);
 
-            if (fromBlock && fromBlock < nodeEarliestBlock)
+            if (network.fromBlock && network.fromBlock < nodeEarliestBlock)
                 return Promise.reject(`${url} is alive, but does not have enough block history`);
 
             let nodeLatestBlockTime = status.syncInfo.latestBlockTime;
-            if (syncWindow && syncWindow > 0 && (Date.now() - nodeLatestBlockTime.getDate() > syncWindow))
+            console.log(`${url} sync ${nodeLatestBlockTime.getTime()}`)
+            if (!network.fromBlock && syncWindow && syncWindow > 0 &&
+                (new Date().getTime() - nodeLatestBlockTime.getTime() > syncWindow))
                 return Promise.reject(`${url} is alive, but has not fully synced`);
 
             return Promise.resolve(url);
         }
 
-        let handlerWithTimeout = (url: string) => awaitWithTimeout(handler(url), 10000);
+        let handlerWithTimeout = (url: string) => awaitWithTimeout(handler(url), 10000, `${url} : Failed by timeout`);
 
         let result = await Promise.allSettled(urls.map(url => handlerWithTimeout(url)));
 
-        //result.forEach(rpc => console.log(isFulfilled(rpc) ? rpc.value + " is alive" : rpc.reason));
+        result.forEach(rpc => {
+            if (isFulfilled(rpc))
+                console.log("\x1b[32m", `${rpc.value} is alive`, "\x1b[0m")
+            else
+                console.log("\x1b[31m", `${rpc.reason}`, "\x1b[0m")
+        });
+
         return result.filter(isFulfilled).map(x => x.value!);
     }
 

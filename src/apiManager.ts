@@ -20,7 +20,6 @@ export class ApiManager {
         useChainRegistryRpcs: boolean = false
     ) {
         let networkManager = await NetworkManager.create(network, useChainRegistryRpcs);
-        console.log(`Network ${network.name} endpoint set ${networkManager.getClients().map(x => x.rpcUrl)}`)
         return new ApiManager(networkManager, storage);
     }
 
@@ -51,7 +50,7 @@ export class ApiManager {
                 response = await awaitWithTimeout(client.getBlock(height), 10000);
                 break;
             } catch (err: any) {
-                let msg = `Error fetching block header in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;
+                let msg = `Error fetching block header on height ${height} in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;
                 console.warn(new Error(msg));
             }
         };
@@ -75,7 +74,7 @@ export class ApiManager {
                 response = await awaitWithTimeout(client.searchTx(`tx.height=${height}`), 10000);
                 break;
             } catch (err: any) {
-                let msg = `Error fetching indexed txs in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;
+                let msg = `Error fetching indexed txs on height ${height} in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;
                 console.log(new Error(msg));
             }
         }

@@ -139,7 +139,7 @@ export class BlocksWatcher {
                 latestHeight = await api.fetchLatestHeight(nextHeight);
 
                 if (firstLoop)
-                    console.log(`Latest network height is ${latestHeight}`);
+                    console.log(`Latest ${network.name} height is ${latestHeight}`);
                 firstLoop = false;
             }
 
