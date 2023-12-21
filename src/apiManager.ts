@@ -4,6 +4,7 @@ import { CantGetBlockHeaderErr, CantGetLatestHeightErr } from "./errors";
 import { Network } from "./blocksWatcher";
 import { Block, IndexedTx } from "@cosmjs/stargate";
 import { IndexerStorage } from "./storage";
+import { Comet38Client, StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
 
 export class ApiManager {
     protected readonly manager: NetworkManager;
@@ -21,6 +22,24 @@ export class ApiManager {
     ) {
         let networkManager = await NetworkManager.create(network, useChainRegistryRpcs);
         return new ApiManager(networkManager, storage);
+    }
+
+    async watchLatestHeight(onHeightRecieve: (status: StatusResponse) => Promise<void>) {
+        let handlers = this.manager.getClients().map(async client => {
+            let tmClient = await connectComet(client.rpcUrl);
+
+            while (true) {
+                try {
+                    console.log('request to ' + client.rpcUrl);
+                    let status = await tmClient.status();
+                    await onHeightRecieve(status);
+                } catch { }
+
+                await new Promise(res => setTimeout(res, 1000));
+            }
+        })
+
+        await Promise.allSettled(handlers);
     }
 
     async fetchLatestHeight(lastKnownHeight: number = 0): Promise<number> {

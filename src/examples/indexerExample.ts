@@ -1,4 +1,3 @@
-import { IndexedTx } from "@cosmjs/stargate";
 import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
 
 (async () => {
@@ -7,7 +6,11 @@ import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
         .useNetwork({
             //network name, as mentioned here https://github.com/cosmos/chain-registry/
             name: "stargaze",
-            //RAW_TXS - txs without execution result, INDEXED_TXS - txs with eventlogs
+            //RAW_TXS - txs without execution result
+            //INDEXED_TXS - txs with eventlogs
+            //ONLY_HEIGHT - block heights with date, for minters
+            //In case of ONLY_HEIGHT It will poll rpcs every second for new height (/status endpoint), 
+            //so please don't run this for a long time. 
             dataToFetch: "INDEXED_TXS",
             //you can pass custom RPC, it will prioritize it over registry's rpcs
             //rpcUrls: [ "your-rpc.com:26657" ],
@@ -24,7 +27,7 @@ import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
             //now you can handle block with txs, how you want
             //if dataToFetch set to "INDEXED_TXS", cast block to "as IndexedBlock" 
             //if dataToFetch set to "RAW_TXS", cast block to "as Block"
-            //if dataToFetch set to "ONLY_HEIGHT", cast block to "as number"  
+            //if dataToFetch set to "ONLY_HEIGHT", cast block to tuple "as [number, Date]"  
             onBlockRecievedCallback: async (ctx, block) => {
                 let b = block as IndexedBlock;
                 console.log(ctx.chain.chain_name, b.header.height, b.txs.map((x: any) => x.hash))
@@ -35,6 +38,7 @@ import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
             name: "persistence",
             dataToFetch: "RAW_TXS"
         })
+        //block cache, in case if you need to reindex data in future
         //typeorm datasourceoptions object https://orkhan.gitbook.io/typeorm/docs/data-source-options 
         .useBlockCache({
             type: "postgres",

@@ -7,6 +7,7 @@ import assert from 'assert';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { IndexerStorage, CachedTxs, CachedBlock } from './storage';
 import { isRejected } from './helpers';
+import { StatusResponse } from '@cosmjs/tendermint-rpc';
 
 export class BlocksWatcher {
     chains: Network[] = [];
@@ -74,7 +75,10 @@ export class BlocksWatcher {
                     );
 
                     this.networks.set(network.name, apiManager);
-                    await this.runNetwork(network);
+                    if (network.dataToFetch === "ONLY_HEIGHTS")
+                        await this.runNetworkOnlyHeight(network)
+                    else
+                        await this.runNetwork(network);
                 } catch (e) {
                     console.log(e);
                     //todo handle other types of errors
@@ -194,6 +198,28 @@ export class BlocksWatcher {
             }
         }
     }
+
+    async runNetworkOnlyHeight(network: Network) {
+        let chainData = chains.find(x => x.chain_name === network.name)!;
+        if (!chainData) {
+            throw new UnknownChainErr(network.name);
+        }
+
+        let api = this.networks.get(network.name)!;
+        let currentStatus: StatusResponse | null = null;
+        await api.watchLatestHeight(async (newStatus) => {
+            if (!currentStatus || newStatus.syncInfo.latestBlockHeight > currentStatus.syncInfo.latestBlockHeight) {
+                currentStatus = newStatus;
+                await network.onBlockRecievedCallback(
+                    { chain: chainData },
+                    [
+                        newStatus.syncInfo.latestBlockHeight,
+                        new Date(newStatus.syncInfo.latestBlockTime.getTime())
+                    ]
+                );
+            }
+        })
+    }
 }
 
 export type Network = {
@@ -220,14 +246,14 @@ export interface WatcherContext {
     chain: Chain
 }
 
-export type DataToFetch = "RAW_TXS" | "INDEXED_TXS";
+export type DataToFetch = "RAW_TXS" | "INDEXED_TXS" | "ONLY_HEIGHTS";
 
-export type IndexerBlock = Block | IndexedBlock | number;
+export type IndexerBlock = Block | IndexedBlock | [height: number, date: Date];
 
 export interface IndexedBlock extends Omit<Block, "txs"> {
     txs: IndexedTx[]
 }
 
 function getBlockHeight(block: IndexerBlock) {
-    return typeof block === "number" ? block : block.header.height;
+    return Array.isArray(block) ? block[0] : block.header.height;
 }
