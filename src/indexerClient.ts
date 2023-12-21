@@ -13,7 +13,7 @@ export class IndexerClient {
         this.client = client;
     }
 
-    static async createIndexer(opts: ClientOptions): Promise<IndexerClient> {
+    static async createClient(opts: ClientOptions): Promise<IndexerClient> {
         let client = await StargateClient.connect(opts.rpcUrl);
         return new IndexerClient(client, opts);
     }

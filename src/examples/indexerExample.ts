@@ -1,5 +1,5 @@
 import { IndexedTx } from "@cosmjs/stargate";
-import { BlocksWatcher } from "../blocksWatcher";
+import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
 
 (async () => {
     await BlocksWatcher
@@ -12,7 +12,23 @@ import { BlocksWatcher } from "../blocksWatcher";
             //you can pass custom RPC, it will prioritize it over registry's rpcs
             //rpcUrls: [ "your-rpc.com:26657" ],
             //you can start from specific block, but be sure that there's at least one node stores data from this block
-            fromBlock: 11177007
+            fromBlock: 11177007,
+            //lag for 10 block if it's ok for you to have a "near-real-time" data, 
+            //it will wait for all nodes to sync and you'll get less errors
+            //default 0
+            lag: 10,
+            //Basically, this means "i don't give a fuck about nodes, just give me latest block height faster as possible"
+            //Will be useful for fcfs mints, but throws much more errors. 
+            //default true
+            awaitTimeForNewBlocks: false,
+            //now you can handle block with txs, how you want
+            //if dataToFetch set to "INDEXED_TXS", cast block to "as IndexedBlock" 
+            //if dataToFetch set to "RAW_TXS", cast block to "as Block"
+            //if dataToFetch set to "ONLY_HEIGHT", cast block to "as number"  
+            onBlockRecievedCallback: async (ctx, block) => {
+                let b = block as IndexedBlock;
+                console.log(ctx.chain.chain_name, b.header.height, b.txs.map((x: any) => x.hash))
+            }
         })
         //there could be multiple networks
         .useNetwork({
@@ -34,10 +50,5 @@ import { BlocksWatcher } from "../blocksWatcher";
         .useChainRegistryRpcs()
         //if fromBlock specified, it will fetch 5 block in parallel, please don't use large batches, rpc could throw 429's 
         .useBatchFetching(5)
-        //now you can handle block with txs, how you want
-        //cast block to "as IndexedBlock" if dataToFetch set to "INDEXED_TXS", otherwise "as Block"
-        .onBlockRecieved(async (ctx, block) => {
-            console.log(ctx.chain.chain_name, block.header.height, block.txs.map((x: any) => x.hash))
-        })
         .run()
 })();

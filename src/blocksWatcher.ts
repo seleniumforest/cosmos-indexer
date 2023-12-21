@@ -11,8 +11,6 @@ import { isRejected } from './helpers';
 export class BlocksWatcher {
     chains: Network[] = [];
     networks: Map<string, ApiManager> = new Map();
-    onBlockRecievedCallback: (ctx: WatcherContext, block: Block | IndexedBlock) => Promise<void> =
-        () => Promise.reject("No onRecieve callback provided");
     maxBlocksInBatch: number = 1;
     fetchChainRegistryRpcs: boolean;
     cacheSource?: DataSource;
@@ -26,8 +24,16 @@ export class BlocksWatcher {
         return ind;
     }
 
-    useNetwork(network: Network) {
-        this.chains.push(network);
+    useNetwork(network: Partial<Network>) {
+        if (network.fromBlock)
+            assert(network.fromBlock > 0, "fromBlock should be positive");
+        if (network.lag)
+            assert(network.lag > 0, "lag should be positive");
+
+        this.chains.push({
+            ...defaultNetworkProps,
+            ...network
+        });
         return this;
     }
 
@@ -51,11 +57,6 @@ export class BlocksWatcher {
         return this;
     }
 
-    onBlockRecieved(handler: (ctx: WatcherContext, block: Block | IndexedBlock) => Promise<void>) {
-        this.onBlockRecievedCallback = handler;
-        return this;
-    }
-
     //Execution section
     async run(): Promise<void> {
         if (this.cacheSource) {
@@ -75,6 +76,7 @@ export class BlocksWatcher {
                     this.networks.set(network.name, apiManager);
                     await this.runNetwork(network);
                 } catch (e) {
+                    console.log(e);
                     //todo handle other types of errors
                     if (e instanceof UnknownChainErr) {
                         return Promise.reject();
@@ -97,10 +99,8 @@ export class BlocksWatcher {
 
         let api = this.networks.get(network.name)!;
         let nextHeight = network.fromBlock ? (network.fromBlock || 1) : 0;
-        let skipGetLatestHeight = false;
         let latestHeight: number = -1;
-        let memoizedBatchBlocks: Map<number, Block | IndexedBlock> =
-            new Map<number, Block | IndexedBlock>();
+        let memoizedBatchBlocks = new Map<number, IndexerBlock>();
 
         let getBlock = async (height: number) => {
             let memo = memoizedBatchBlocks.get(height);
@@ -108,44 +108,48 @@ export class BlocksWatcher {
                 return memo;
 
             let composed = await composeBlock(height);
-            memoizedBatchBlocks.set(composed.header.height, composed);
+            memoizedBatchBlocks.set(getBlockHeight(composed), composed);
             return composed;
         }
 
-        let composeBlock = async (height: number): Promise<Block | IndexedBlock> => {
+        let composeBlock = async (height: number): Promise<IndexerBlock> => {
+            // if (network.dataToFetch === "ONLY_HEIGHT")
+            //     return height;
+
             let block = await api.fetchBlock(height);
 
-            switch (network.dataToFetch) {
-                case "RAW_TXS":
-                    return block;
-                case "INDEXED_TXS":
-                    let isEmptyBlock = block.txs.length === 0;
+            if (network.dataToFetch === "RAW_TXS")
+                return block;
 
-                    return {
-                        ...block,
-                        txs: isEmptyBlock ? [] : await api.fetchIndexedTxs(height)
-                    } as IndexedBlock
-                default:
-                    return block
-            }
+            if (network.dataToFetch === "INDEXED_TXS")
+                return {
+                    ...block,
+                    txs: block.txs.length === 0 ? [] : await api.fetchIndexedTxs(height)
+                } as IndexedBlock;
+
+            return block;
         }
 
-        let firstLoop = true
+        let cachingUpNetwork = false;
+        let firstLoop = true;
         while (true) {
             if (firstLoop && network.fromBlock)
                 console.log(`Running network ${network.name} from block ${network.fromBlock}`);
 
-            if (!skipGetLatestHeight) {
+            if (!cachingUpNetwork) {
                 latestHeight = await api.fetchLatestHeight(nextHeight);
+                if (network.lag)
+                    latestHeight = latestHeight - network.lag;
 
                 if (firstLoop)
-                    console.log(`Latest ${network.name} height is ${latestHeight}`);
+                    console.log(`Latest ${network.name} height is ${latestHeight}` +
+                        (network.lag > 0 ? ` with lag ${network.lag}` : ""));
                 firstLoop = false;
             }
 
             //no new block commited into network
-            if (nextHeight == latestHeight) {
-                await new Promise(res => setTimeout(res, 10000))
+            if (network.awaitTimeForNewBlocks && nextHeight == latestHeight) {
+                await new Promise(res => setTimeout(res, 15000))
                 continue;
             }
 
@@ -165,36 +169,51 @@ export class BlocksWatcher {
                 )
 
             let blocks = blockResults
-                .map(b => (b as PromiseFulfilledResult<Block>)?.value)
-                .sort((a, b) => a.header.height > b.header.height ? 1 : -1);
+                .map(b => (b as PromiseFulfilledResult<IndexerBlock>)?.value)
+                .sort((a, b) => getBlockHeight(a) > getBlockHeight(b) ? 1 : -1);
 
             for (const block of blocks) {
-                if (block.header.height !== nextHeight)
+                if (getBlockHeight(block) !== nextHeight)
                     break;
 
                 try {
-                    await this.onBlockRecievedCallback({ chain: chainData }, block);
+                    await network.onBlockRecievedCallback({ chain: chainData }, block);
                     nextHeight++;
                 } catch (e: any) {
                     throw new Error("Error executing callback " + e?.message + "\n" + e?.stack)
                 }
             }
 
-            skipGetLatestHeight = nextHeight < latestHeight;
+            cachingUpNetwork = nextHeight < latestHeight;
             if (memoizedBatchBlocks.size > this.maxBlocksInBatch * 2)
                 memoizedBatchBlocks.clear();
 
-            if (!skipGetLatestHeight)
-                await new Promise(res => setTimeout(res, 5000));
+            if (!cachingUpNetwork) {
+                let timeout = network.awaitTimeForNewBlocks ? 10000 : 1000;
+                await new Promise(res => setTimeout(res, timeout));
+            }
         }
     }
 }
 
-export interface Network {
+export type Network = {
     name: string,
     fromBlock?: number,
-    dataToFetch?: DataToFetch
-    rpcUrls?: string[]
+    dataToFetch: DataToFetch
+    rpcUrls: string[],
+    lag: number,
+    awaitTimeForNewBlocks: boolean,
+    onBlockRecievedCallback: (ctx: WatcherContext, block: IndexerBlock) => Promise<void>
+}
+
+const defaultNetworkProps: Network = {
+    name: "",
+    fromBlock: undefined,
+    dataToFetch: "RAW_TXS",
+    rpcUrls: [],
+    lag: 0,
+    awaitTimeForNewBlocks: true,
+    onBlockRecievedCallback: () => Promise.reject("No onRecieve callback provided")
 }
 
 export interface WatcherContext {
@@ -203,6 +222,12 @@ export interface WatcherContext {
 
 export type DataToFetch = "RAW_TXS" | "INDEXED_TXS";
 
+export type IndexerBlock = Block | IndexedBlock | number;
+
 export interface IndexedBlock extends Omit<Block, "txs"> {
     txs: IndexedTx[]
+}
+
+function getBlockHeight(block: IndexerBlock) {
+    return typeof block === "number" ? block : block.header.height;
 }

@@ -21,6 +21,8 @@ export class NetworkManager {
             console.log("No rpcs found");
 
         this.clients = clients;
+
+        setInterval(() => this.logStatus(), 60 * 1000 * 60);
     }
 
     static async create(
@@ -76,7 +78,6 @@ export class NetworkManager {
                 return Promise.reject(`${url} is alive, but does not have enough block history`);
 
             let nodeLatestBlockTime = status.syncInfo.latestBlockTime;
-            console.log(`${url} sync ${nodeLatestBlockTime.getTime()}`)
             if (!network.fromBlock && syncWindow && syncWindow > 0 &&
                 (new Date().getTime() - nodeLatestBlockTime.getTime() > syncWindow))
                 return Promise.reject(`${url} is alive, but has not fully synced`);
@@ -107,6 +108,7 @@ export class NetworkManager {
         };
     }
 
+    //<kekw>
     getClients(ranked?: boolean): IndexerClient[] {
         let customRpcExists = this.clients.filter(x => x.priority).length > 0;
         if (customRpcExists && ranked === undefined)
@@ -117,6 +119,7 @@ export class NetworkManager {
 
         return this.getRankedClients();
     }
+    //</kekw>
 
     private getUnrankedClients(): IndexerClient[] {
         return this.clients.sort((a) => a.priority ? -1 : 1);
@@ -151,7 +154,7 @@ export class NetworkManager {
         let clients = await Promise.allSettled(
             rpcs.map(async (rpcUrl) => {
                 try {
-                    return await IndexerClient.createIndexer({ rpcUrl, priority });
+                    return await IndexerClient.createClient({ rpcUrl, priority });
                 } catch {
                     return Promise.reject();
                 }
@@ -159,6 +162,10 @@ export class NetworkManager {
         );
 
         return clients.filter(isFulfilled).map(x => x.value);
+    }
+
+    private logStatus() {
+        this.clients.forEach(x => console.log(`${x.rpcUrl}, ok = ${x.ok}, fail = ${x.fail}`))
     }
 
     static async getChainInfo(chain: string) {

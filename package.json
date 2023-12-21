@@ -10,7 +10,7 @@
   "dependencies": {
     "@cosmjs/stargate": "0.32.1",
     "@cosmjs/tendermint-rpc": "^0.32.1",
-    "chain-registry": "1.24.1",
+    "chain-registry": "1.25.0",
     "pg": "^8.11.3",
     "ts-node": "10.9.1",
     "typeorm": "^0.3.17",
