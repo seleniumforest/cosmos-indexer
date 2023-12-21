@@ -20,10 +20,6 @@ import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
             //it will wait for all nodes to sync and you'll get less errors
             //default 0
             lag: 10,
-            //Basically, this means "i don't give a fuck about nodes, just give me latest block height faster as possible"
-            //Will be useful for fcfs mints, but throws much more errors. 
-            //default true
-            awaitTimeForNewBlocks: false,
             //now you can handle block with txs, how you want
             //if dataToFetch set to "INDEXED_TXS", cast block to "as IndexedBlock" 
             //if dataToFetch set to "RAW_TXS", cast block to "as Block"

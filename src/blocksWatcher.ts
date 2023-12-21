@@ -152,7 +152,7 @@ export class BlocksWatcher {
             }
 
             //no new block commited into network
-            if (network.awaitTimeForNewBlocks && nextHeight == latestHeight) {
+            if (nextHeight == latestHeight) {
                 await new Promise(res => setTimeout(res, 15000))
                 continue;
             }
@@ -192,10 +192,8 @@ export class BlocksWatcher {
             if (memoizedBatchBlocks.size > this.maxBlocksInBatch * 2)
                 memoizedBatchBlocks.clear();
 
-            if (!cachingUpNetwork) {
-                let timeout = network.awaitTimeForNewBlocks ? 10000 : 1000;
-                await new Promise(res => setTimeout(res, timeout));
-            }
+            if (!cachingUpNetwork)
+                await new Promise(res => setTimeout(res, 10000));
         }
     }
 
@@ -228,7 +226,6 @@ export type Network = {
     dataToFetch: DataToFetch
     rpcUrls: string[],
     lag: number,
-    awaitTimeForNewBlocks: boolean,
     onBlockRecievedCallback: (ctx: WatcherContext, block: IndexerBlock) => Promise<void>
 }
 
@@ -238,7 +235,6 @@ const defaultNetworkProps: Network = {
     dataToFetch: "RAW_TXS",
     rpcUrls: [],
     lag: 0,
-    awaitTimeForNewBlocks: true,
     onBlockRecievedCallback: () => Promise.reject("No onRecieve callback provided")
 }
 
