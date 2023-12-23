@@ -102,7 +102,7 @@ export class BlocksWatcher {
         }
 
         let api = this.networks.get(network.name)!;
-        let nextHeight = network.fromBlock ? (network.fromBlock || 1) : Math.max(network.lag, 0);
+        let nextHeight = network.fromBlock ? (network.fromBlock || 1) : 0;
         let latestHeight: number = -1;
         let memoizedBatchBlocks = new Map<number, IndexerBlock>();
 
@@ -157,9 +157,12 @@ export class BlocksWatcher {
                 continue;
             }
 
-            let heightToStart = nextHeight === 0 ? nextHeight = latestHeight : nextHeight
+            if (nextHeight === 0) {
+                nextHeight = latestHeight;
+            }
+
             let targetBlocks = [...Array(this.maxBlocksInBatch).keys()]
-                .map(i => i + heightToStart)
+                .map(i => i + nextHeight)
                 .filter(x => x <= latestHeight);
 
             let blockResults = await Promise.allSettled(
