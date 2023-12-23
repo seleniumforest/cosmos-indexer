@@ -85,7 +85,7 @@ export class NetworkManager {
             return Promise.resolve(url);
         }
 
-        let handlerWithTimeout = (url: string) => awaitWithTimeout(handler(url), 10000, `${url} : Failed by timeout`);
+        let handlerWithTimeout = (url: string) => awaitWithTimeout(handler(url), 60000, `${url} : Failed by timeout`);
 
         let result = await Promise.allSettled(urls.map(url => handlerWithTimeout(url)));
 
