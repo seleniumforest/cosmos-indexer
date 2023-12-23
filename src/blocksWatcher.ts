@@ -102,7 +102,7 @@ export class BlocksWatcher {
         }
 
         let api = this.networks.get(network.name)!;
-        let nextHeight = network.fromBlock ? (network.fromBlock || 1) : 0;
+        let nextHeight = network.fromBlock ? (network.fromBlock || 1) : Math.max(network.lag, 0);
         let latestHeight: number = -1;
         let memoizedBatchBlocks = new Map<number, IndexerBlock>();
 
@@ -143,7 +143,7 @@ export class BlocksWatcher {
             if (!cachingUpNetwork) {
                 latestHeight = await api.fetchLatestHeight(nextHeight);
                 if (network.lag)
-                    latestHeight = latestHeight - network.lag;
+                    latestHeight = Math.max(latestHeight - network.lag, 1);
 
                 if (firstLoop)
                     console.log(`Latest ${network.name} height is ${latestHeight}` +

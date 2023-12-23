@@ -12,13 +12,14 @@ export class NetworkManager {
     readonly network: string = "";
     protected clients: IndexerClient[] = [];
     static readonly chainInfoCache = new Map<string, { timestamp: number, chain: Chain }>();
-    static readonly defaultSyncWindow = 1000 * 100; // 100s
+    static readonly defaultSyncWindow = 1000 * 30; // 30s
 
     protected constructor(network: string, clients: IndexerClient[]) {
         this.network = network;
 
-        if (clients.length === 0)
-            console.log("No rpcs found");
+        if (clients.length === 0) {
+            throw new Error("No rpcs found")
+        }
 
         this.clients = clients;
 
@@ -78,7 +79,7 @@ export class NetworkManager {
                 return Promise.reject(`${url} is alive, but does not have enough block history`);
 
             let nodeLatestBlockTime = status.syncInfo.latestBlockTime;
-            if (!network.fromBlock && syncWindow && syncWindow > 0 &&
+            if (syncWindow && syncWindow > 0 &&
                 (new Date().getTime() - nodeLatestBlockTime.getTime() > syncWindow))
                 return Promise.reject(`${url} is alive, but has not fully synced`);
 
