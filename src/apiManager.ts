@@ -62,7 +62,7 @@ export class ApiManager {
         let cached = await this.storage.getBlockByHeight(height);
         if (cached) return cached;
 
-        let clients = this.manager.getClients();
+        let clients = this.manager.getClients(true);
         let response;
         for (const client of clients) {
             try {
@@ -86,7 +86,7 @@ export class ApiManager {
         let cached = await this.storage.getTxsByHeight(height);
         if (cached) return cached;
 
-        let clients = this.manager.getClients();
+        let clients = this.manager.getClients(true);
         let response;
         for (const client of clients) {
             try {
