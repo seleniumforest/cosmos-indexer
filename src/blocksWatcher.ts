@@ -6,7 +6,7 @@ import { UnknownChainErr } from './errors';
 import assert from 'assert';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { IndexerStorage, CachedTxs, CachedBlock } from './storage';
-import { isRejected } from './helpers';
+import { isRejected, logger } from './helpers';
 import { StatusResponse } from '@cosmjs/tendermint-rpc';
 
 export class BlocksWatcher {
@@ -49,6 +49,15 @@ export class BlocksWatcher {
         return this;
     }
 
+    /**
+     * 
+     * @param lvl 0: silly, 1: trace, 2: debug, 3: info, 4: warn, 5: error, 6: fatal
+     */
+    useLogLevel(lvl: number) {
+        logger.settings.minLevel = lvl;
+        return this;
+    }
+
     useBlockCache(opts: DataSourceOptions) {
         this.cacheSource = new DataSource({
             ...opts,
@@ -61,7 +70,7 @@ export class BlocksWatcher {
     //Execution section
     async run(): Promise<void> {
         if (this.cacheSource) {
-            console.log(`Initializing DB...`);
+            logger.trace(`Initializing DB...`);
             await this.cacheSource.initialize();
         }
 
@@ -80,7 +89,7 @@ export class BlocksWatcher {
                     else
                         await this.runNetwork(network);
                 } catch (e) {
-                    console.log(e);
+                    logger.error(e);
                     //todo handle other types of errors
                     if (e instanceof UnknownChainErr) {
                         return Promise.reject();
@@ -138,7 +147,7 @@ export class BlocksWatcher {
         let firstLoop = true;
         while (true) {
             if (firstLoop && network.fromBlock)
-                console.log(`Running network ${network.name} from block ${network.fromBlock}`);
+                logger.trace(`Running network ${network.name} from block ${network.fromBlock}`);
 
             if (!cachingUpNetwork) {
                 latestHeight = await api.fetchLatestHeight(nextHeight);
@@ -146,7 +155,7 @@ export class BlocksWatcher {
                     latestHeight = Math.max(latestHeight - network.lag, 1);
 
                 if (firstLoop)
-                    console.log(`Latest ${network.name} height is ${latestHeight}` +
+                    logger.trace(`Latest ${network.name} height is ${latestHeight}` +
                         (network.lag > 0 ? ` with lag ${network.lag}` : ""));
                 firstLoop = false;
             }

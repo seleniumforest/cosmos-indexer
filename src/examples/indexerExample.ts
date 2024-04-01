@@ -29,11 +29,6 @@ import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
                 console.log(ctx.chain.chain_name, b.header.height, b.txs.map((x: any) => x.hash))
             }
         })
-        //there could be multiple networks
-        .useNetwork({
-            name: "persistence",
-            dataToFetch: "RAW_TXS"
-        })
         //block cache, in case if you need to reindex data in future
         //typeorm datasourceoptions object https://orkhan.gitbook.io/typeorm/docs/data-source-options 
         .useBlockCache({

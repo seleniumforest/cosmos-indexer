@@ -1,6 +1,6 @@
 import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
-import { awaitWithTimeout, isFulfilled } from "./helpers";
+import { awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
 import { UnknownChainErr } from "./errors";
@@ -31,7 +31,7 @@ export class NetworkManager {
         setInterval(() => this.logStatus(), 60 * 1000 * 60);
         setInterval(() => {
             (async () => {
-                console.log("updating rpcs");
+                logger.info("Updating rpcs...");
                 let newClients = await NetworkManager.fetchClients(network, addChainRegistryRpcs, syncWindow);
                 let newRpcSet = [...this.clients];
                 for (const newRpc of newClients) {
@@ -39,14 +39,13 @@ export class NetworkManager {
                         continue;
 
                     newRpcSet.push(newRpc);
-                    console.log(`New RPC ${newRpc.rpcUrl}`);
+                    logger.info(`New RPC ${newRpc.rpcUrl}`);
                 }
 
                 this.clients = newRpcSet;
-                console.log("Current Endpoint Set:")
-                this.clients.forEach(x => console.log(x.rpcUrl))
+                logger.info("Current Endpoint Set:", this.clients.map(x => x.rpcUrl))
             })();
-        }, 60 * 1000);
+        }, 60 * 1000 * 60 * 24);
     }
 
     static async create(
@@ -63,17 +62,18 @@ export class NetworkManager {
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = this.defaultSyncWindow
     ) {
-        console.log(`Updating ${network.name} RPCs:`);
+        logger.trace(`Updating ${network.name} RPCs:`);
         let registryRpcUrls: string[] = [];
         let customRpcUrls = network.rpcUrls || [];
         let onlyIndexingRpcs = network.dataToFetch === "INDEXED_TXS";
         if (addChainRegistryRpcs) {
-            console.log(`Searching RPCs for ${network.name} in chain registry...`);
+            logger.trace(`Searching RPCs for ${network.name} in chain registry...`);
             let { rpc } = await this.getChainRpcs(network.name);
             registryRpcUrls = rpc;
+            logger.trace(`Found ${rpc.length} rpcs for network ${network.name}`);
         }
 
-        console.log(`Checking ${network.name} RPCs...`);
+        logger.trace(`Checking ${network.name} RPCs...`);
         registryRpcUrls = await this.filterRpcs(network, registryRpcUrls, onlyIndexingRpcs, syncWindow);
         customRpcUrls = await this.filterRpcs(network, customRpcUrls, onlyIndexingRpcs, syncWindow)
 
@@ -121,12 +121,15 @@ export class NetworkManager {
 
         let result = await Promise.allSettled(urls.map(url => handlerWithTimeout(url)));
 
-        result.forEach(rpc => {
-            if (isFulfilled(rpc))
-                console.log("\x1b[32m", `${rpc.value} is alive`, "\x1b[0m")
-            else
-                console.log("\x1b[31m", `${rpc.reason}`, "\x1b[0m")
-        });
+        if (result.length > 0) {
+            logger.info(`RPC Status for network ${network.name}:`);
+            result.forEach(rpc => {
+                if (isFulfilled(rpc))
+                    logger.info("\x1b[32m", `${rpc.value} is alive`, "\x1b[0m")
+                else
+                    logger.info("\x1b[31m", `${rpc.reason}`, "\x1b[0m")
+            });
+        }
 
         return result.filter(isFulfilled).map(x => x.value!);
     }
@@ -197,7 +200,7 @@ export class NetworkManager {
     }
 
     private logStatus() {
-        this.clients.forEach(x => console.log(`\n${x.rpcUrl}, ok = ${x.ok}, fail = ${x.fail}`))
+        this.clients.forEach(x => logger.info(`\n${x.rpcUrl}, ok = ${x.ok}, fail = ${x.fail}`))
     }
 
     static async getChainInfo(chain: string) {

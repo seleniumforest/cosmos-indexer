@@ -1,5 +1,5 @@
 import { NetworkManager } from "./networkManager";
-import { awaitWithTimeout, isFulfilled } from "./helpers";
+import { awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { CantGetBlockHeaderErr, CantGetLatestHeightErr } from "./errors";
 import { Network } from "./blocksWatcher";
 import { Block, IndexedTx } from "@cosmjs/stargate";
@@ -93,7 +93,7 @@ export class ApiManager {
                 break;
             } catch (err: any) {
                 let msg = `Error fetching indexed txs on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error : ${err}`;
-                console.log(new Error(msg));
+                logger.warn(new Error(msg));
             }
         }
         if (!response)
