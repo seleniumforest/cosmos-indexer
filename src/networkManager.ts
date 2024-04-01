@@ -9,12 +9,17 @@ import { StatusResponse } from "@cosmjs/tendermint-rpc/build/comet38";
 
 export class NetworkManager {
     protected readonly minRequestsToTest: number = 20;
-    readonly network: string = "";
+    readonly network: Network;
     protected clients: IndexerClient[] = [];
     static readonly chainInfoCache = new Map<string, { timestamp: number, chain: Chain }>();
     static readonly defaultSyncWindow = 1000 * 30; // 30s
 
-    protected constructor(network: string, clients: IndexerClient[]) {
+    private constructor(
+        network: Network,
+        addChainRegistryRpcs: boolean = false,
+        syncWindow: number = NetworkManager.defaultSyncWindow,
+        clients: IndexerClient[]
+    ) {
         this.network = network;
 
         if (clients.length === 0) {
@@ -24,6 +29,24 @@ export class NetworkManager {
         this.clients = clients;
 
         setInterval(() => this.logStatus(), 60 * 1000 * 60);
+        setInterval(() => {
+            (async () => {
+                console.log("updating rpcs");
+                let newClients = await NetworkManager.fetchClients(network, addChainRegistryRpcs, syncWindow);
+                let newRpcSet = [...this.clients];
+                for (const newRpc of newClients) {
+                    if (!!newRpcSet.find(x => x.rpcUrl === newRpc.rpcUrl))
+                        continue;
+
+                    newRpcSet.push(newRpc);
+                    console.log(`New RPC ${newRpc.rpcUrl}`);
+                }
+
+                this.clients = newRpcSet;
+                console.log("Current Endpoint Set:")
+                this.clients.forEach(x => console.log(x.rpcUrl))
+            })();
+        }, 60 * 1000);
     }
 
     static async create(
@@ -31,7 +54,16 @@ export class NetworkManager {
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = this.defaultSyncWindow
     ): Promise<NetworkManager> {
-        console.log(`Initializing ${network.name} RPCs:`);
+        let clients = await this.fetchClients(network, addChainRegistryRpcs, syncWindow);
+        return new NetworkManager(network, addChainRegistryRpcs, syncWindow, clients);
+    }
+
+    static async fetchClients(
+        network: Network,
+        addChainRegistryRpcs: boolean = false,
+        syncWindow: number = this.defaultSyncWindow
+    ) {
+        console.log(`Updating ${network.name} RPCs:`);
         let registryRpcUrls: string[] = [];
         let customRpcUrls = network.rpcUrls || [];
         let onlyIndexingRpcs = network.dataToFetch === "INDEXED_TXS";
@@ -48,9 +80,8 @@ export class NetworkManager {
         let registryRpcClients = await this.getClients(registryRpcUrls, false);
         let customRpcClients = await this.getClients(customRpcUrls, true);
 
-        return new NetworkManager(network.name, registryRpcClients.concat(customRpcClients));
+        return registryRpcClients.concat(customRpcClients);
     }
-
 
     static async filterRpcs(
         network: Network,
@@ -120,7 +151,7 @@ export class NetworkManager {
 
         return this.getRankedClients();
     }
-    //</kekw>
+    //</kekw>this.clients.push(...newClients.filter(x => this.clients.find(y => y.rpcUrl !== x.rpcUrl)));
 
     private getUnrankedClients(): IndexerClient[] {
         return this.clients.sort((a) => a.priority ? -1 : 1);
@@ -166,7 +197,7 @@ export class NetworkManager {
     }
 
     private logStatus() {
-        this.clients.forEach(x => console.log(`${x.rpcUrl}, ok = ${x.ok}, fail = ${x.fail}`))
+        this.clients.forEach(x => console.log(`\n${x.rpcUrl}, ok = ${x.ok}, fail = ${x.fail}`))
     }
 
     static async getChainInfo(chain: string) {
@@ -190,4 +221,6 @@ export class NetworkManager {
 
         return result;
     }
+
+
 }

@@ -13,6 +13,16 @@
             ],
             "program": "${workspaceFolder}/src/example.ts",
             "runtimeExecutable": "ts-node"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "debug",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/src/debug.ts",
+            "runtimeExecutable": "ts-node"
         }
     ]
 }

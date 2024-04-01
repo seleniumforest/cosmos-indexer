@@ -1,6 +1,6 @@
 # Indexer for Cosmos SDK based blockchains
 
-Iterates blocks from given height and catches up latest blocks. Takes every block and transaction, and passes it to your handler. Works with multiple RPCs from chain-registry, balancing between them, or with your own RPC. Optionally, caches blocks into your db to reindex data faster.
+Iterates blocks from given height and catches up latest blocks. Takes every block header and/or transactions, and passes it to your handler. Works with multiple RPCs from chain-registry, balancing between them, or with your own prioritized RPC. Optionally, caches blocks into your db to reindex data faster.
 
 ## Usecases
 

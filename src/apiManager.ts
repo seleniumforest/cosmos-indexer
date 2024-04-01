@@ -4,7 +4,7 @@ import { CantGetBlockHeaderErr, CantGetLatestHeightErr } from "./errors";
 import { Network } from "./blocksWatcher";
 import { Block, IndexedTx } from "@cosmjs/stargate";
 import { IndexerStorage } from "./storage";
-import { Comet38Client, StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
+import { StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
 
 export class ApiManager {
     protected readonly manager: NetworkManager;
@@ -30,7 +30,6 @@ export class ApiManager {
 
             while (true) {
                 try {
-                    console.log('request to ' + client.rpcUrl);
                     let status = await tmClient.status();
                     await onHeightRecieve(status);
                 } catch { }
@@ -53,7 +52,7 @@ export class ApiManager {
         let result = Math.max(...success, lastKnownHeight);
 
         if (lastKnownHeight > 0 && result === 0)
-            throw new CantGetLatestHeightErr(this.manager.network, clients.map(x => x.rpcUrl));
+            throw new CantGetLatestHeightErr(this.manager.network.name, clients.map(x => x.rpcUrl));
 
         return result;
     }
@@ -69,13 +68,13 @@ export class ApiManager {
                 response = await awaitWithTimeout(client.getBlock(height), 10000);
                 break;
             } catch (err: any) {
-                let msg = `Error fetching block header on height ${height} in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;
+                let msg = `Error fetching block header on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error : ${err}`;
                 console.warn(new Error(msg));
             }
         };
 
         if (!response)
-            throw new CantGetBlockHeaderErr(this.manager.network, height, clients.map(x => x.rpcUrl));
+            throw new CantGetBlockHeaderErr(this.manager.network.name, height, clients.map(x => x.rpcUrl));
 
         await this.storage.saveBlock(response);
 
@@ -93,12 +92,12 @@ export class ApiManager {
                 response = await awaitWithTimeout(client.searchTx(`tx.height=${height}`), 10000);
                 break;
             } catch (err: any) {
-                let msg = `Error fetching indexed txs on height ${height} in ${this.manager.network} rpc ${client.rpcUrl} error : ${err}`;
+                let msg = `Error fetching indexed txs on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error : ${err}`;
                 console.log(new Error(msg));
             }
         }
         if (!response)
-            throw new CantGetBlockHeaderErr(this.manager.network, height, clients.map(x => x.rpcUrl));
+            throw new CantGetBlockHeaderErr(this.manager.network.name, height, clients.map(x => x.rpcUrl));
 
         await this.storage.saveTxs(response, height)
 
