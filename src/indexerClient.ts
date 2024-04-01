@@ -1,4 +1,5 @@
 import { Block, IndexedTx, SearchTxQuery, StargateClient } from "@cosmjs/stargate";
+import { logger } from "./helpers";
 
 export class IndexerClient {
     client: StargateClient;
@@ -19,38 +20,27 @@ export class IndexerClient {
     }
 
     async getBlock(height?: number | undefined): Promise<Block> {
-        try {
-            let block = await this.client.getBlock(height);
-            this.ok++;
-
-            return block;
-        } catch (err: any) {
-            this.fail++;
-            return Promise.reject(err?.message)
-        }
+        return await this.useResultReporting(() => this.client.getBlock(height));
     }
 
     async searchTx(query: SearchTxQuery): Promise<IndexedTx[]> {
-        try {
-            let txs = await this.client.searchTx(query);
-            this.ok++;
-
-            return txs;
-        } catch (err: any) {
-            this.fail++;
-            return Promise.reject(err?.message);
-        }
+        return await this.useResultReporting(() => this.client.searchTx(query));
     }
 
     async getHeight(): Promise<number> {
+        return await this.useResultReporting(() => this.client.getHeight());
+    }
+
+    private async useResultReporting(func: any) {
         try {
-            let lastestHeight = await this.client.getHeight();
+            let result = await func();
             this.ok++;
 
-            return lastestHeight;
+            return Promise.resolve(result);
         } catch (err: any) {
             this.fail++;
-            return Promise.reject(err?.message);
+            logger.warn("RPC response err", err)
+            return Promise.reject();
         }
     }
 }

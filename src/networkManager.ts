@@ -1,9 +1,8 @@
 import { Chain } from "@chain-registry/types";
 import { Network } from "./blocksWatcher";
-import { awaitWithTimeout, isFulfilled, logger } from "./helpers";
+import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
-import { UnknownChainErr } from "./errors";
 import { connectComet } from "@cosmjs/tendermint-rpc";
 import { StatusResponse } from "@cosmjs/tendermint-rpc/build/comet38";
 
@@ -12,7 +11,7 @@ export class NetworkManager {
     readonly network: Network;
     protected clients: IndexerClient[] = [];
     static readonly chainInfoCache = new Map<string, { timestamp: number, chain: Chain }>();
-    static readonly defaultSyncWindow = 1000 * 30; // 30s
+    static readonly defaultSyncWindow = INTERVALS.second * 30; // 30s
 
     private constructor(
         network: Network,
@@ -23,12 +22,14 @@ export class NetworkManager {
         this.network = network;
 
         if (clients.length === 0) {
-            throw new Error("No rpcs found")
+            let msg = "No rpcs found";
+            logger.error(msg);
+            throw new Error(msg);
         }
 
         this.clients = clients;
 
-        setInterval(() => this.logStatus(), 60 * 1000 * 60);
+        setInterval(() => this.logStatus(), INTERVALS.hour);
         setInterval(() => {
             (async () => {
                 logger.info("Updating rpcs...");
@@ -45,7 +46,7 @@ export class NetworkManager {
                 this.clients = newRpcSet;
                 logger.info("Current Endpoint Set:", this.clients.map(x => x.rpcUrl))
             })();
-        }, 60 * 1000 * 60 * 24);
+        }, INTERVALS.day);
     }
 
     static async create(
@@ -62,7 +63,7 @@ export class NetworkManager {
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = this.defaultSyncWindow
     ) {
-        logger.trace(`Updating ${network.name} RPCs:`);
+        logger.trace(`Syncing ${network.name} RPCs:`);
         let registryRpcUrls: string[] = [];
         let customRpcUrls = network.rpcUrls || [];
         let onlyIndexingRpcs = network.dataToFetch === "INDEXED_TXS";
@@ -117,7 +118,8 @@ export class NetworkManager {
             return Promise.resolve(url);
         }
 
-        let handlerWithTimeout = (url: string) => awaitWithTimeout(handler(url), 60000, `${url} : Failed by timeout`);
+        let handlerWithTimeout = (url: string) =>
+            awaitWithTimeout(handler(url), INTERVALS.second * 30, `${url} : Failed by timeout`);
 
         let result = await Promise.allSettled(urls.map(url => handlerWithTimeout(url)));
 
@@ -154,7 +156,7 @@ export class NetworkManager {
 
         return this.getRankedClients();
     }
-    //</kekw>this.clients.push(...newClients.filter(x => this.clients.find(y => y.rpcUrl !== x.rpcUrl)));
+    //</kekw>
 
     private getUnrankedClients(): IndexerClient[] {
         return this.clients.sort((a) => a.priority ? -1 : 1);
@@ -200,12 +202,12 @@ export class NetworkManager {
     }
 
     private logStatus() {
-        this.clients.forEach(x => logger.info(`\n${x.rpcUrl}, ok = ${x.ok}, fail = ${x.fail}`))
+        this.clients.forEach(x => logger.info(`${x.rpcUrl}, ok = ${x.ok}, fail = ${x.fail}`))
     }
 
     static async getChainInfo(chain: string) {
         let cached = this.chainInfoCache.get(chain);
-        if (cached && Date.now() - cached.timestamp < 1000 * 60 * 60 * 12) {
+        if (cached && Date.now() - cached.timestamp < INTERVALS.hour) {
             return cached.chain;
         }
 
@@ -215,15 +217,16 @@ export class NetworkManager {
             this.chainInfoCache.set(chain, { timestamp: Date.now(), chain: githubResponse });
             return githubResponse;
         } catch (e) {
-            console.warn(`Coudn't fetch latest chains info from Github`);
+            logger.warn(`Coudn't fetch latest chains info from Github`);
         }
 
         let result = chains.find(x => x.chain_name === chain);
-        if (!result)
-            throw new UnknownChainErr(chain);
+        if (!result) {
+            let message = `Unknown chain ${chain}`;
+            logger.error(message);
+            return Promise.reject();
+        }
 
         return result;
     }
-
-
 }

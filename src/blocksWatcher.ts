@@ -2,11 +2,10 @@ import { ApiManager } from './apiManager';
 import { Block, IndexedTx } from '@cosmjs/stargate';
 import { Chain } from '@chain-registry/types';
 import { chains } from 'chain-registry';
-import { UnknownChainErr } from './errors';
 import assert from 'assert';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { IndexerStorage, CachedTxs, CachedBlock } from './storage';
-import { isRejected, logger } from './helpers';
+import { INTERVALS, isRejected, logger } from './helpers';
 import { StatusResponse } from '@cosmjs/tendermint-rpc';
 
 export class BlocksWatcher {
@@ -26,9 +25,10 @@ export class BlocksWatcher {
     }
 
     useNetwork(network: Partial<Network>) {
-        if (network.fromBlock)
+        assert(!!network.name === true, "please specify network name");
+        if (network.fromBlock != undefined)
             assert(network.fromBlock > 0, "fromBlock should be positive");
-        if (network.lag)
+        if (network.lag != undefined)
             assert(network.lag > 0, "lag should be positive");
 
         this.chains.push({
@@ -89,13 +89,8 @@ export class BlocksWatcher {
                     else
                         await this.runNetwork(network);
                 } catch (e) {
-                    logger.error(e);
-                    //todo handle other types of errors
-                    if (e instanceof UnknownChainErr) {
-                        return Promise.reject();
-                    };
-
-                    await new Promise(res => setTimeout(res, 30000));
+                    logger.error("Error occured: ", e);
+                    await new Promise(res => setTimeout(res, INTERVALS.minute));
                 }
             }
         }
@@ -107,7 +102,9 @@ export class BlocksWatcher {
     async runNetwork(network: Network): Promise<void> {
         let chainData = chains.find(x => x.chain_name === network.name);
         if (!chainData) {
-            throw new UnknownChainErr(network.name);
+            let message = `Unknown chain ${network.name}`;
+            logger.error(message);
+            return Promise.reject();
         }
 
         let api = this.networks.get(network.name)!;
@@ -162,7 +159,7 @@ export class BlocksWatcher {
 
             //no new block commited into network
             if (nextHeight == latestHeight) {
-                await new Promise(res => setTimeout(res, 15000))
+                await new Promise(res => setTimeout(res, INTERVALS.second * 15))
                 continue;
             }
 
@@ -181,7 +178,7 @@ export class BlocksWatcher {
             blockResults
                 .filter(isRejected)
                 .forEach(x =>
-                    console.warn(`targetBlocks ${targetBlocks.at(0)}-${targetBlocks.at(-1)} rejection reason: ${x.reason}`)
+                    logger.warn(`targetBlocks ${targetBlocks.at(0)}-${targetBlocks.at(-1)} rejection reason: ${x.reason}`)
                 )
 
             let blocks = blockResults
@@ -205,14 +202,16 @@ export class BlocksWatcher {
                 memoizedBatchBlocks.clear();
 
             if (!cachingUpNetwork)
-                await new Promise(res => setTimeout(res, 10000));
+                await new Promise(res => setTimeout(res, INTERVALS.second * 10));
         }
     }
 
     async runNetworkOnlyHeight(network: Network) {
         let chainData = chains.find(x => x.chain_name === network.name)!;
         if (!chainData) {
-            throw new UnknownChainErr(network.name);
+            let message = `Unknown chain ${network.name}`;
+            logger.error(message);
+            return Promise.reject();
         }
 
         let api = this.networks.get(network.name)!;

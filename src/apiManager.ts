@@ -1,6 +1,5 @@
 import { NetworkManager } from "./networkManager";
-import { awaitWithTimeout, isFulfilled, logger } from "./helpers";
-import { CantGetBlockHeaderErr, CantGetLatestHeightErr } from "./errors";
+import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { Network } from "./blocksWatcher";
 import { Block, IndexedTx } from "@cosmjs/stargate";
 import { IndexerStorage } from "./storage";
@@ -34,7 +33,7 @@ export class ApiManager {
                     await onHeightRecieve(status);
                 } catch { }
 
-                await new Promise(res => setTimeout(res, 1000));
+                await new Promise(res => setTimeout(res, INTERVALS.second));
             }
         })
 
@@ -45,14 +44,17 @@ export class ApiManager {
         let clients = this.manager.getClients();
 
         let results = await Promise.allSettled(
-            clients.map(client => awaitWithTimeout(client.getHeight(), 10000))
+            clients.map(client => awaitWithTimeout(client.getHeight(), INTERVALS.second * 10))
         );
 
         let success = results.filter(isFulfilled).map(x => x.value) as number[];
         let result = Math.max(...success, lastKnownHeight);
 
-        if (lastKnownHeight > 0 && result === 0)
-            throw new CantGetLatestHeightErr(this.manager.network.name, clients.map(x => x.rpcUrl));
+        if (lastKnownHeight > 0 && result === 0) {
+            let message = `Couldn't get latest height for network ${this.manager.network.name} with endpoints set`;
+            logger.error(message, clients.map(x => x.rpcUrl));
+            return Promise.reject();
+        }
 
         return result;
     }
@@ -65,16 +67,19 @@ export class ApiManager {
         let response;
         for (const client of clients) {
             try {
-                response = await awaitWithTimeout(client.getBlock(height), 10000);
+                response = await awaitWithTimeout(client.getBlock(height), INTERVALS.second * 10);
                 break;
             } catch (err: any) {
                 let msg = `Error fetching block header on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error : ${err}`;
-                console.warn(new Error(msg));
+                logger.warn(new Error(msg));
             }
         };
 
-        if (!response)
-            throw new CantGetBlockHeaderErr(this.manager.network.name, height, clients.map(x => x.rpcUrl));
+        if (!response) {
+            let message = `Couldn't get latest block header ${height} for network ${this.manager.network.name} with endpoints set}`;
+            logger.error(message, clients.map(x => x.rpcUrl))
+            return Promise.reject();
+        }
 
         await this.storage.saveBlock(response);
 
@@ -89,18 +94,21 @@ export class ApiManager {
         let response;
         for (const client of clients) {
             try {
-                response = await awaitWithTimeout(client.searchTx(`tx.height=${height}`), 10000);
+                response = await awaitWithTimeout(client.searchTx(`tx.height=${height}`), INTERVALS.second * 10);
                 break;
             } catch (err: any) {
-                let msg = `Error fetching indexed txs on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error : ${err}`;
-                logger.warn(new Error(msg));
+                let msg = `Error fetching indexed txs on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error:`;
+                logger.warn(msg, err);
             }
         }
-        if (!response)
-            throw new CantGetBlockHeaderErr(this.manager.network.name, height, clients.map(x => x.rpcUrl));
+
+        if (!response) {
+            let message = `Couldn't get latest block header ${height} for network ${this.manager.network.name} with endpoints set}`;
+            logger.error(message, clients.map(x => x.rpcUrl))
+            return Promise.reject();
+        }
 
         await this.storage.saveTxs(response, height)
-
         return response;
     }
 }
