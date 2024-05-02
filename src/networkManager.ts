@@ -1,5 +1,5 @@
 import { Chain } from "@chain-registry/types";
-import { Network } from "./blocksWatcher";
+import { BlocksWatcherNetwork } from "./blocksWatcher";
 import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
@@ -8,13 +8,13 @@ import { StatusResponse } from "@cosmjs/tendermint-rpc/build/comet38";
 
 export class NetworkManager {
     protected readonly minRequestsToTest: number = 20;
-    readonly network: Network;
+    readonly network: BlocksWatcherNetwork;
     protected clients: IndexerClient[] = [];
     static readonly chainInfoCache = new Map<string, { timestamp: number, chain: Chain }>();
     static readonly defaultSyncWindow = INTERVALS.second * 30; // 30s
 
     private constructor(
-        network: Network,
+        network: BlocksWatcherNetwork,
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = NetworkManager.defaultSyncWindow,
         clients: IndexerClient[]
@@ -50,7 +50,7 @@ export class NetworkManager {
     }
 
     static async create(
-        network: Network,
+        network: BlocksWatcherNetwork,
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = this.defaultSyncWindow
     ): Promise<NetworkManager> {
@@ -59,7 +59,7 @@ export class NetworkManager {
     }
 
     static async fetchClients(
-        network: Network,
+        network: BlocksWatcherNetwork,
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = this.defaultSyncWindow
     ) {
@@ -85,7 +85,7 @@ export class NetworkManager {
     }
 
     static async filterRpcs(
-        network: Network,
+        network: BlocksWatcherNetwork,
         urls: string[],
         onlyIndexingRpcs?: boolean,
         syncWindow?: number //difference between latest block and now, in seconds

@@ -9,8 +9,8 @@ import { INTERVALS, isRejected, logger } from './helpers';
 import { StatusResponse } from '@cosmjs/tendermint-rpc';
 
 export class BlocksWatcher {
-    chains: Network[] = [];
-    networks: Map<string, ApiManager> = new Map();
+    chains: BlocksWatcherNetwork[] = [];
+    apis: Map<string, ApiManager> = new Map();
     maxBlocksInBatch: number = 1;
     fetchChainRegistryRpcs: boolean;
     cacheSource?: DataSource;
@@ -24,7 +24,7 @@ export class BlocksWatcher {
         return ind;
     }
 
-    useNetwork(network: Partial<Network>) {
+    useNetwork(network: Partial<BlocksWatcherNetwork>) {
         assert(!!network.name === true, "please specify network name");
         if (network.fromBlock != undefined)
             assert(network.fromBlock > 0, "fromBlock should be positive");
@@ -74,7 +74,7 @@ export class BlocksWatcher {
             await this.cacheSource.initialize();
         }
 
-        let chainWorkerDelegate = async (network: Network) => {
+        let chainWorkerDelegate = async (network: BlocksWatcherNetwork) => {
             while (true) {
                 try {
                     let apiManager = await ApiManager.createApiManager(
@@ -83,7 +83,7 @@ export class BlocksWatcher {
                         this.fetchChainRegistryRpcs
                     );
 
-                    this.networks.set(network.name, apiManager);
+                    this.apis.set(network.name, apiManager);
                     if (network.dataToFetch === "ONLY_HEIGHTS")
                         await this.runNetworkOnlyHeight(network)
                     else
@@ -99,7 +99,7 @@ export class BlocksWatcher {
         await Promise.allSettled(chainWorkers);
     }
 
-    async runNetwork(network: Network): Promise<void> {
+    async runNetwork(network: BlocksWatcherNetwork): Promise<void> {
         let chainData = chains.find(x => x.chain_name === network.name);
         if (!chainData) {
             let message = `Unknown chain ${network.name}`;
@@ -107,7 +107,7 @@ export class BlocksWatcher {
             return Promise.reject();
         }
 
-        let api = this.networks.get(network.name)!;
+        let api = this.apis.get(network.name)!;
         let nextHeight = network.fromBlock ? (network.fromBlock || 1) : 0;
         let latestHeight: number = -1;
         let memoizedBatchBlocks = new Map<number, IndexerBlock>();
@@ -153,7 +153,7 @@ export class BlocksWatcher {
 
                 if (firstLoop)
                     logger.trace(`Latest ${network.name} height is ${latestHeight}` +
-                        (network.lag > 0 ? ` with lag ${network.lag}` : ""));
+                        (network.lag && network.lag > 0 ? ` with lag ${network.lag}` : ""));
                 firstLoop = false;
             }
 
@@ -190,7 +190,7 @@ export class BlocksWatcher {
                     break;
 
                 try {
-                    await network.onBlockRecievedCallback({ chain: chainData }, block);
+                    await network.onDataRecievedCallback({ chain: chainData }, block);
                     nextHeight++;
                 } catch (e: any) {
                     throw new Error("Error executing callback " + e?.message + "\n" + e?.stack)
@@ -206,7 +206,7 @@ export class BlocksWatcher {
         }
     }
 
-    async runNetworkOnlyHeight(network: Network) {
+    async runNetworkOnlyHeight(network: BlocksWatcherNetwork) {
         let chainData = chains.find(x => x.chain_name === network.name)!;
         if (!chainData) {
             let message = `Unknown chain ${network.name}`;
@@ -214,12 +214,12 @@ export class BlocksWatcher {
             return Promise.reject();
         }
 
-        let api = this.networks.get(network.name)!;
+        let api = this.apis.get(network.name)!;
         let currentStatus: StatusResponse | null = null;
         await api.watchLatestHeight(async (newStatus) => {
             if (!currentStatus || newStatus.syncInfo.latestBlockHeight > currentStatus.syncInfo.latestBlockHeight) {
                 currentStatus = newStatus;
-                await network.onBlockRecievedCallback(
+                await network.onDataRecievedCallback(
                     { chain: chainData },
                     [
                         newStatus.syncInfo.latestBlockHeight,
@@ -233,29 +233,45 @@ export class BlocksWatcher {
 
 export type Network = {
     name: string,
+    rpcUrls?: string[],
     fromBlock?: number,
-    dataToFetch: DataToFetch
-    rpcUrls: string[],
-    lag: number,
-    onBlockRecievedCallback: (ctx: WatcherContext, block: IndexerBlock) => Promise<void>
+    dataToFetch?: DataToFetch,
+    lag?: number,
 }
 
-const defaultNetworkProps: Network = {
+export type BlocksWatcherNetwork = Network & {
+    onDataRecievedCallback: (ctx: BlocksWatcherContext, block: IndexerBlock) => Promise<void>
+}
+
+export type LogsWatcherNetwork = Network & {
+    onDataRecievedCallback: (ctx: LogsWatcherContext, txs: IndexedTx[]) => Promise<void>
+}
+
+const defaultNetworkProps: BlocksWatcherNetwork = {
     name: "",
     fromBlock: undefined,
     dataToFetch: "RAW_TXS",
     rpcUrls: [],
     lag: 0,
-    onBlockRecievedCallback: () => Promise.reject("No onRecieve callback provided")
+    onDataRecievedCallback: () => Promise.reject("No onRecieve callback provided")
 }
 
-export interface WatcherContext {
+export type WatcherContext = BlocksWatcherContext | LogsWatcherContext;
+
+export interface BlocksWatcherContext {
     chain: Chain
+}
+
+export interface LogsWatcherContext {
+    chain: Chain,
+    range: [number, number]
 }
 
 export type DataToFetch = "RAW_TXS" | "INDEXED_TXS" | "ONLY_HEIGHTS";
 
 export type IndexerBlock = Block | IndexedBlock | [height: number, date: Date];
+
+export type LogsWatcherData = IndexedTx[];
 
 export interface IndexedBlock extends Omit<Block, "txs"> {
     txs: IndexedTx[]
