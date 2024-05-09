@@ -4,7 +4,7 @@ import { Chain } from '@chain-registry/types';
 import { chains } from 'chain-registry';
 import assert from 'assert';
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { IndexerStorage, CachedTxs, CachedBlock } from './storage';
+import { IndexerStorage, CachedTxs, CachedBlock } from './modules/storage';
 import { INTERVALS, isRejected, logger } from './helpers';
 import { StatusResponse } from '@cosmjs/tendermint-rpc';
 

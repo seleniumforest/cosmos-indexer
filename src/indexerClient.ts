@@ -1,37 +1,46 @@
 import { Block, IndexedTx, SearchTxQuery, StargateClient } from "@cosmjs/stargate";
 import { logger } from "./helpers";
+import { BlockResultsResponse, CometClient, connectComet } from "@cosmjs/tendermint-rpc";
 
 export class IndexerClient {
-    client: StargateClient;
+    client: CometClient;
     ok: number = 0;
     fail: number = 0;
     rpcUrl: string = "";
     priority: boolean = false;
 
-    private constructor(client: StargateClient, opts: ClientOptions) {
+    private constructor(client: CometClient, opts: ClientOptions) {
         this.rpcUrl = opts.rpcUrl;
         this.priority = opts.priority;
         this.client = client;
     }
 
     static async createClient(opts: ClientOptions): Promise<IndexerClient> {
-        let client = await StargateClient.connect(opts.rpcUrl);
+        let client = await connectComet(opts.rpcUrl);
         return new IndexerClient(client, opts);
     }
 
-    async getBlock(height?: number | undefined): Promise<Block> {
-        return await this.useResultReporting(() => this.client.getBlock(height));
+    async getBlock(height?: number | undefined) {
+        let result = await this.useResultReporting(() => this.client.block(height));
+        return result;
     }
 
-    async searchTx(query: SearchTxQuery): Promise<IndexedTx[]> {
-        return await this.useResultReporting(() => this.client.searchTx(query));
+    async getBlocks(from: number, to: number) {
+        let result = await this.useResultReporting(() => this.client.blockchain(from, to));
+        return result;
+    }
+
+    async searchTx(query: string) {
+        let result = await this.useResultReporting(() => this.client.txSearch({ query }));
+        return result;
     }
 
     async getHeight(): Promise<number> {
-        return await this.useResultReporting(() => this.client.getHeight());
+        let result = await this.useResultReporting(() => this.client.blockResults());
+        return result.height;
     }
 
-    private async useResultReporting(func: any) {
+    private async useResultReporting<T>(func: () => T) {
         try {
             let result = await func();
             this.ok++;

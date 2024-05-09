@@ -2,7 +2,7 @@ import { NetworkManager } from "./networkManager";
 import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { BlocksWatcherNetwork } from "./blocksWatcher";
 import { Block, IndexedTx, SearchTxQuery } from "@cosmjs/stargate";
-import { IndexerStorage } from "./storage";
+import { IndexerStorage } from "./modules/storage";
 import { StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
 
 export class ApiManager {
@@ -83,10 +83,10 @@ export class ApiManager {
 
         this.storage && await this.storage.saveBlock(response);
 
-        return response;
+        return { ...response.block, id: "" };
     }
 
-    async fetchIndexedTxs(height: number): Promise<readonly IndexedTx[]> {
+    async fetchIndexedTxs(height: number) {
         let cached = this.storage && await this.storage.getTxsByHeight(height);
         if (cached) return cached;
 
@@ -96,11 +96,11 @@ export class ApiManager {
         return response;
     }
 
-    async fetchSearchTxs(query: SearchTxQuery) {
+    async fetchSearchTxs(query: string) {
         return await this.fetchTxsWithTimeout(query, INTERVALS.second * 30);
     }
 
-    private async fetchTxsWithTimeout(query: SearchTxQuery, timeout = INTERVALS.second * 10) {
+    private async fetchTxsWithTimeout(query: string, timeout = INTERVALS.second * 10) {
         let clients = this.manager.getClients(true);
         for (const client of clients) {
             try {
