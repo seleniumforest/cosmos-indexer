@@ -8,8 +8,10 @@ import { StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
 export class ApiManager {
     protected readonly manager: NetworkManager;
     protected readonly storage?: IndexerStorage;
+    protected readonly retryCounts: number;
 
-    protected constructor(manager: NetworkManager, storage?: IndexerStorage) {
+    protected constructor(manager: NetworkManager, storage?: IndexerStorage, retryCounts?: number) {
+        this.retryCounts = retryCounts || 3;
         this.manager = manager;
         this.storage = storage;
     }
@@ -17,10 +19,11 @@ export class ApiManager {
     static async createApiManager(
         network: BlocksWatcherNetwork,
         storage?: IndexerStorage,
-        useChainRegistryRpcs: boolean = false
+        useChainRegistryRpcs: boolean = false,
+        retryCounts?: number
     ) {
         let networkManager = await NetworkManager.create(network, useChainRegistryRpcs);
-        return new ApiManager(networkManager, storage);
+        return new ApiManager(networkManager, storage, retryCounts);
     }
 
     async watchLatestHeight(onHeightRecieve: (status: StatusResponse) => Promise<void>) {
@@ -65,15 +68,21 @@ export class ApiManager {
 
         let clients = this.manager.getClients(true);
         let response;
-        for (const client of clients) {
-            try {
-                response = await awaitWithTimeout(client.getBlock(height), INTERVALS.second * 10);
-                break;
-            } catch (err: any) {
-                let msg = `Error fetching block header on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error : ${err}`;
-                logger.warn(new Error(msg));
-            }
-        };
+        let retryCount = 0;
+
+        while (retryCount <= this.retryCounts) {
+            retryCount++;
+
+            for (const client of clients) {
+                try {
+                    response = await awaitWithTimeout(client.getBlock(height), INTERVALS.second * 10);
+                    break;
+                } catch (err: any) {
+                    let msg = `Error fetching block header on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error : ${err}`;
+                    logger.warn(new Error(msg));
+                }
+            };
+        }
 
         if (!response) {
             let message = `Couldn't get latest block header ${height} for network ${this.manager.network.name} with endpoints set}`;
@@ -90,7 +99,8 @@ export class ApiManager {
         let cached = this.storage && await this.storage.getTxsByHeight(height);
         if (cached) return cached;
 
-        let response = await this.fetchTxsWithTimeout(`tx.height=${height}`);
+        //keep 60s for fat blocks
+        let response = await this.fetchTxsWithTimeout(`tx.height=${height}`, INTERVALS.second * 60);
 
         this.storage && await this.storage.saveTxs(response, height)
         return response;
@@ -102,12 +112,18 @@ export class ApiManager {
 
     private async fetchTxsWithTimeout(query: SearchTxQuery, timeout = INTERVALS.second * 10) {
         let clients = this.manager.getClients(true);
-        for (const client of clients) {
-            try {
-                return await awaitWithTimeout(client.searchTx(query), timeout);
-            } catch (err: any) {
-                let msg = `Failed searching txs with query ${query} in ${this.manager.network.name} rpc ${client.rpcUrl} error:`;
-                logger.warn(msg, err);
+        let retryCount = 0;
+
+        while (retryCount <= this.retryCounts) {
+            retryCount++;
+
+            for (const client of clients) {
+                try {
+                    return await awaitWithTimeout(client.searchTx(query), timeout);
+                } catch (err: any) {
+                    let msg = `Failed searching txs with query ${query} in ${this.manager.network.name} rpc ${client.rpcUrl} error:`;
+                    logger.warn(msg, err);
+                }
             }
         }
 

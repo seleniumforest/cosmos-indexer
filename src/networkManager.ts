@@ -1,5 +1,5 @@
 import { Chain } from "@chain-registry/types";
-import { BlocksWatcherNetwork } from "./blocksWatcher";
+import { Network } from "./blocksWatcher";
 import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
@@ -8,13 +8,13 @@ import { StatusResponse } from "@cosmjs/tendermint-rpc/build/comet38";
 
 export class NetworkManager {
     protected readonly minRequestsToTest: number = 20;
-    readonly network: BlocksWatcherNetwork;
+    readonly network: Network;
     protected clients: IndexerClient[] = [];
     static readonly chainInfoCache = new Map<string, { timestamp: number, chain: Chain }>();
     static readonly defaultSyncWindow = INTERVALS.second * 30; // 30s
 
     private constructor(
-        network: BlocksWatcherNetwork,
+        network: Network,
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = NetworkManager.defaultSyncWindow,
         clients: IndexerClient[]
@@ -50,16 +50,18 @@ export class NetworkManager {
     }
 
     static async create(
-        network: BlocksWatcherNetwork,
+        network: Network,
         addChainRegistryRpcs: boolean = false,
-        syncWindow: number = this.defaultSyncWindow
+        syncWindow: number = this.defaultSyncWindow,
+        logLvl: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 2
     ): Promise<NetworkManager> {
+        logger.settings.minLevel = logLvl;
         let clients = await this.fetchClients(network, addChainRegistryRpcs, syncWindow);
         return new NetworkManager(network, addChainRegistryRpcs, syncWindow, clients);
     }
 
     static async fetchClients(
-        network: BlocksWatcherNetwork,
+        network: Network,
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = this.defaultSyncWindow
     ) {
@@ -85,7 +87,7 @@ export class NetworkManager {
     }
 
     static async filterRpcs(
-        network: BlocksWatcherNetwork,
+        network: Network,
         urls: string[],
         onlyIndexingRpcs?: boolean,
         syncWindow?: number //difference between latest block and now, in seconds

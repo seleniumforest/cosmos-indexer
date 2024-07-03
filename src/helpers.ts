@@ -8,7 +8,7 @@ export const isRejected = <T,>(p: PromiseSettledResult<T>): p is PromiseRejected
 export async function awaitWithTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMsg?: string): Promise<T> {
     const timeoutPromise = new Promise<T>((_, reject) => {
         setTimeout(() => {
-            reject(new Error(errorMsg || "Timeout exceeded"));
+            reject(new Error(errorMsg || `Timeout ${timeoutMs} exceeded`));
         }, timeoutMs);
     });
 
