@@ -1,6 +1,6 @@
 import { IndexedTx } from "@cosmjs/stargate"
 import { Block } from "@cosmjs/stargate"
-import { Entity, Column, PrimaryGeneratedColumn, Index, DataSource } from "typeorm"
+import { Entity, Column, PrimaryGeneratedColumn, Index, DataSource, DataSourceOptions } from "typeorm"
 
 @Entity()
 export class CachedBlock {
@@ -31,6 +31,9 @@ export class CachedTxs {
     height: number
 
     @Column()
+    chainId: string
+
+    @Column()
     data: string
 }
 
@@ -38,8 +41,15 @@ export class IndexerStorage {
     //null means caching is not enabled
     dataSource?: DataSource;
 
-    public constructor(dataSource?: DataSource) {
-        this.dataSource = dataSource;
+    public constructor(opts?: DataSourceOptions) {
+        if (opts) {
+            this.dataSource = new DataSource({
+                ...opts,
+                synchronize: true,
+                entities: [CachedBlock, CachedTxs]
+            });
+            this.dataSource.initialize();
+        }
     }
 
     async getBlockByHeight(height: number) {
@@ -89,12 +99,13 @@ export class IndexerStorage {
         }
     }
 
-    async saveTxs(txs: IndexedTx[], height: number) {
+    async saveTxs(txs: IndexedTx[], height: number, chainId: string) {
         if (!this.dataSource) return;
 
         let repo = this.dataSource.getRepository(CachedTxs);
         await repo.save({
             height,
+            chainId,
             data: JSON.stringify(txs.map(x => ({
                 ...x,
                 gasUsed: x.gasUsed.toString(),

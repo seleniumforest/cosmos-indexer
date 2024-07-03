@@ -13,7 +13,7 @@ export class BlocksWatcher {
     apis: Map<string, ApiManager> = new Map();
     maxBlocksInBatch: number = 1;
     fetchChainRegistryRpcs: boolean;
-    cacheSource?: DataSource;
+    opts?: DataSourceOptions;
 
     //Builder section
     private constructor() {
@@ -59,27 +59,25 @@ export class BlocksWatcher {
     }
 
     useBlockCache(opts: DataSourceOptions) {
-        this.cacheSource = new DataSource({
-            ...opts,
-            entities: [CachedBlock, CachedTxs]
-        })
-
+        this.opts = opts;
         return this;
     }
 
     //Execution section
     async run(): Promise<void> {
-        if (this.cacheSource) {
-            logger.trace(`Initializing DB...`);
-            await this.cacheSource.initialize();
-        }
-
         let chainWorkerDelegate = async (network: BlocksWatcherNetwork) => {
             while (true) {
                 try {
+                    let storage;
+
+                    if (this.opts) {
+                        logger.trace(`Initializing DB...`);
+                        storage = new IndexerStorage(this.opts);
+                    }
+
                     let apiManager = await ApiManager.createApiManager(
                         network,
-                        new IndexerStorage(this.cacheSource),
+                        storage,
                         this.fetchChainRegistryRpcs
                     );
 
@@ -134,7 +132,7 @@ export class BlocksWatcher {
             if (network.dataToFetch === "INDEXED_TXS")
                 return {
                     ...block,
-                    txs: block.txs.length === 0 ? [] : await api.fetchIndexedTxs(height)
+                    txs: block.txs.length === 0 ? [] : await api.fetchIndexedTxs(height, block.header.chainId)
                 } as IndexedBlock;
 
             return block;

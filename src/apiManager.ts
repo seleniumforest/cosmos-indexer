@@ -95,14 +95,14 @@ export class ApiManager {
         return response;
     }
 
-    async fetchIndexedTxs(height: number): Promise<readonly IndexedTx[]> {
+    async fetchIndexedTxs(height: number, chainId: string): Promise<readonly IndexedTx[]> {
         let cached = this.storage && await this.storage.getTxsByHeight(height);
         if (cached) return cached;
 
         //keep 60s for fat blocks
         let response = await this.fetchTxsWithTimeout(`tx.height=${height}`, INTERVALS.second * 60);
 
-        this.storage && await this.storage.saveTxs(response, height)
+        this.storage && await this.storage.saveTxs(response, height, chainId)
         return response;
     }
 
