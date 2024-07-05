@@ -1,11 +1,11 @@
 import { IndexedTx } from "@cosmjs/stargate"
 import { Block } from "@cosmjs/stargate"
-import { Entity, Column, PrimaryGeneratedColumn, Index, DataSource, DataSourceOptions } from "typeorm"
+import { Entity, Column, ObjectId, Index, DataSource, DataSourceOptions, ObjectIdColumn } from "typeorm"
 
 @Entity()
 export class CachedBlock {
-    @PrimaryGeneratedColumn()
-    id: number
+    @ObjectIdColumn()
+    id: ObjectId
 
     @Column()
     @Index({ unique: true })
@@ -23,8 +23,8 @@ export class CachedBlock {
 
 @Entity()
 export class CachedTxs {
-    @PrimaryGeneratedColumn()
-    id: number
+    @ObjectIdColumn()
+    id: ObjectId
 
     @Column()
     @Index({ unique: true })

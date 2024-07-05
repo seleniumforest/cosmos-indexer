@@ -7,21 +7,11 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "example",
+            "name": "Debug Block Watcher",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/src/example.ts",
-            "runtimeExecutable": "ts-node"
-        },
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "debug",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${workspaceFolder}/src/debug.ts",
+            "program": "${workspaceFolder}/src/BlocksWatcher.debug.ts",
             "runtimeExecutable": "ts-node"
         },
         {
