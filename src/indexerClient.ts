@@ -20,14 +20,17 @@ export class IndexerClient {
     }
 
     async getBlock(height?: number | undefined): Promise<Block> {
+        logger.silly(`Trying to fetch block ${height} from ${this.rpcUrl}`)
         return await this.useResultReporting(() => this.client.getBlock(height));
     }
 
     async searchTx(query: SearchTxQuery): Promise<IndexedTx[]> {
+        logger.silly(`Trying to search txs ${JSON.stringify(query)} from ${this.rpcUrl}`)
         return await this.useResultReporting(() => this.client.searchTx(query));
     }
 
     async getHeight(): Promise<number> {
+        logger.silly(`Trying to get height from ${this.rpcUrl}`);
         return await this.useResultReporting(() => this.client.getHeight());
     }
 

@@ -12,7 +12,10 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/BlocksWatcher.debug.ts",
-            "runtimeExecutable": "ts-node"
+            "runtimeExecutable": "ts-node",
+            "runtimeArgs": [
+                "--transpile-only"
+            ]
         },
         {
             "type": "node",
@@ -22,7 +25,10 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/LogsWatcher.debug.ts",
-            "runtimeExecutable": "ts-node"
+            "runtimeExecutable": "ts-node",
+            "runtimeArgs": [
+                "--transpile-only"
+            ]
         }
     ]
 }

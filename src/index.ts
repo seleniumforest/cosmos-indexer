@@ -10,4 +10,4 @@ export {
 }
 export { Chain } from '@chain-registry/types';
 export { Block } from '@cosmjs/stargate';
-export { IndexedBlock } from "./blocksWatcher";
+export { BlockWithIndexedTxs as IndexedBlock } from "./blocksWatcher";

@@ -63,8 +63,8 @@ export class ApiManager {
     }
 
     async fetchBlock(height: number): Promise<Block> {
-        let cached = this.storage && await this.storage.getBlockByHeight(height);
-        if (cached) return cached;
+        // let cached = this.storage && await this.storage.getBlockByHeight(height);
+        // if (cached) return cached as any;
 
         let clients = this.manager.getClients(true);
         let response;
@@ -90,19 +90,23 @@ export class ApiManager {
             return Promise.reject();
         }
 
-        this.storage && await this.storage.saveBlock(response);
-
         return response;
     }
 
-    async fetchIndexedTxs(height: number, chainId: string): Promise<readonly IndexedTx[]> {
-        let cached = this.storage && await this.storage.getTxsByHeight(height);
-        if (cached) return cached;
+    // async fetchIndexedTxs(height: number, chainId: string): Promise<readonly IndexedTx[]> {
+    //     let cached = this.storage && await this.storage.getTxsByHeight(height);
+    //     if (cached) return cached;
 
+    //     //keep 60s for fat blocks
+    //     let response = await this.fetchTxsWithTimeout(`tx.height=${height}`, INTERVALS.second * 60);
+
+    //     this.storage && await this.storage.saveTxs(response, height, chainId)
+    //     return response;
+    // }
+
+    async fetchIndexedTxs(height: number, chainId: string): Promise<readonly IndexedTx[]> {
         //keep 60s for fat blocks
         let response = await this.fetchTxsWithTimeout(`tx.height=${height}`, INTERVALS.second * 60);
-
-        this.storage && await this.storage.saveTxs(response, height, chainId)
         return response;
     }
 

@@ -1,6 +1,8 @@
 import { IndexedTx } from "@cosmjs/stargate"
 import { Block } from "@cosmjs/stargate"
 import { Entity, Column, ObjectId, Index, DataSource, DataSourceOptions, ObjectIdColumn } from "typeorm"
+import { DataToFetch, IndexerBlock } from "./blocksWatcher"
+import { deserializeObject, serializeObject } from "./helpers"
 
 @Entity()
 export class CachedBlock {
@@ -17,25 +19,29 @@ export class CachedBlock {
     @Column()
     chainId: string
 
+    //"Indexed" | "Raw"
     @Column()
-    data: string
-}
-
-@Entity()
-export class CachedTxs {
-    @ObjectIdColumn()
-    id: ObjectId
-
-    @Column()
-    @Index({ unique: true })
-    height: number
-
-    @Column()
-    chainId: string
+    type: string
 
     @Column()
     data: string
 }
+
+// @Entity()
+// export class CachedTxs {
+//     @ObjectIdColumn()
+//     id: ObjectId
+
+//     @Column()
+//     @Index({ unique: true })
+//     height: number
+
+//     @Column()
+//     chainId: string
+
+//     @Column()
+//     data: string
+// }
 
 export class IndexerStorage {
     //null means caching is not enabled
@@ -46,27 +52,24 @@ export class IndexerStorage {
             this.dataSource = new DataSource({
                 ...opts,
                 synchronize: true,
-                entities: [CachedBlock, CachedTxs]
+                entities: [CachedBlock]
+                // entities: [CachedBlock, CachedTxs]
             });
             this.dataSource.initialize();
         }
     }
 
-    async getBlockByHeight(height: number) {
+    async getBlockByHeight(height: number, type: DataToFetch) {
         if (!this.dataSource) return;
 
         let repo = this.dataSource.getRepository(CachedBlock);
-        let cached = await repo.findOne({ where: { height } });
+        let cached = await repo.findOne({ where: { height, type } });
         if (cached) {
-            let obj = JSON.parse(cached.data) as Block & { txs: string[] };
-            return {
-                ...obj,
-                txs: obj.txs.map((x: any) => new Uint8Array(x.split(",").map((ch: any) => +ch)))
-            }
+            return deserializeObject<IndexerBlock>(cached.data);
         }
     }
 
-    async saveBlock(block: Block) {
+    async saveBlock(block: IndexerBlock) {
         if (!this.dataSource) return;
 
         let repo = this.dataSource.getRepository(CachedBlock);
@@ -74,44 +77,42 @@ export class IndexerStorage {
             chainId: block.header.chainId,
             height: block.header.height,
             time: new Date(block.header.time),
-            data: JSON.stringify({
-                ...block,
-                txs: block.txs.map(x => x.toString())
-            })
+            type: block.type || "",
+            data: serializeObject(block)
         });
     }
 
-    async getTxsByHeight(height: number) {
-        if (!this.dataSource) return;
+    // async getTxsByHeight(height: number) {
+    //     if (!this.dataSource) return;
 
-        let repo = this.dataSource.getRepository(CachedTxs);
-        let cached = await repo.findOne({ where: { height } });
+    //     let repo = this.dataSource.getRepository(CachedTxs);
+    //     let cached = await repo.findOne({ where: { height } });
 
-        if (cached) {
-            let obj = JSON.parse(cached.data) as (IndexedTx & { tx: string })[];
+    //     if (cached) {
+    //         let obj = JSON.parse(cached.data) as (IndexedTx & { tx: string })[];
 
-            return obj.map((x) => ({
-                ...x,
-                gasUsed: BigInt(x.gasUsed),
-                gasWanted: BigInt(x.gasWanted),
-                tx: new Uint8Array(x.tx.split(",").map((ch) => +ch))
-            } as IndexedTx))
-        }
-    }
+    //         return obj.map((x) => ({
+    //             ...x,
+    //             gasUsed: BigInt(x.gasUsed),
+    //             gasWanted: BigInt(x.gasWanted),
+    //             tx: new Uint8Array(x.tx.split(",").map((ch) => +ch))
+    //         } as IndexedTx))
+    //     }
+    // }
 
-    async saveTxs(txs: IndexedTx[], height: number, chainId: string) {
-        if (!this.dataSource) return;
+    // async saveTxs(txs: IndexedTx[], height: number, chainId: string) {
+    //     if (!this.dataSource) return;
 
-        let repo = this.dataSource.getRepository(CachedTxs);
-        await repo.save({
-            height,
-            chainId,
-            data: JSON.stringify(txs.map(x => ({
-                ...x,
-                gasUsed: x.gasUsed.toString(),
-                gasWanted: x.gasWanted.toString(),
-                tx: x.tx.toString()
-            })))
-        });
-    }
+    //     let repo = this.dataSource.getRepository(CachedTxs);
+    //     await repo.save({
+    //         height,
+    //         chainId,
+    //         data: JSON.stringify(txs.map(x => ({
+    //             ...x,
+    //             gasUsed: x.gasUsed.toString(),
+    //             gasWanted: x.gasWanted.toString(),
+    //             tx: x.tx.toString()
+    //         })))
+    //     });
+    // }
 }

@@ -1,4 +1,4 @@
-import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
+import { BlocksWatcher, BlockWithIndexedTxs } from "../blocksWatcher";
 
 (async () => {
     await BlocksWatcher
@@ -25,7 +25,7 @@ import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
             //if dataToFetch set to "RAW_TXS", cast block to "as Block"
             //if dataToFetch set to "ONLY_HEIGHT", cast block to tuple "as [number, Date]"  
             onDataRecievedCallback: async (ctx, block) => {
-                let b = block as IndexedBlock;
+                let b = block as BlockWithIndexedTxs;
                 console.log(ctx.chain.chain_name, b.header.height, b.txs.map((x: any) => x.hash))
             }
         })

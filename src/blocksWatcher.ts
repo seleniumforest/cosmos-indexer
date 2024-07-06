@@ -4,9 +4,10 @@ import { Chain } from '@chain-registry/types';
 import { chains } from 'chain-registry';
 import assert from 'assert';
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { IndexerStorage, CachedTxs, CachedBlock } from './storage';
+import { IndexerStorage, CachedBlock } from './storage';
 import { INTERVALS, isRejected, logger } from './helpers';
 import { StatusResponse } from '@cosmjs/tendermint-rpc';
+import { BatchComposer } from './batchComposer';
 
 export class BlocksWatcher {
     chains: BlocksWatcherNetwork[] = [];
@@ -85,7 +86,7 @@ export class BlocksWatcher {
                     if (network.dataToFetch === "ONLY_HEIGHTS")
                         await this.runNetworkOnlyHeight(network)
                     else
-                        await this.runNetwork(network);
+                        await this.runNetwork(network, storage);
                 } catch (e) {
                     logger.error("Error occured: ", e);
                     await new Promise(res => setTimeout(res, INTERVALS.minute));
@@ -97,7 +98,7 @@ export class BlocksWatcher {
         await Promise.allSettled(chainWorkers);
     }
 
-    async runNetwork(network: BlocksWatcherNetwork): Promise<void> {
+    async runNetwork(network: BlocksWatcherNetwork, storage?: IndexerStorage): Promise<void> {
         let chainData = chains.find(x => x.chain_name === network.name);
         if (!chainData) {
             let message = `Unknown chain ${network.name}`;
@@ -108,41 +109,14 @@ export class BlocksWatcher {
         let api = this.apis.get(network.name)!;
         let nextHeight = network.fromBlock ? (network.fromBlock || 1) : 0;
         let latestHeight: number = -1;
-        let memoizedBatchBlocks = new Map<number, IndexerBlock>();
 
-        let getBlock = async (height: number) => {
-            let memo = memoizedBatchBlocks.get(height);
-            if (memo)
-                return memo;
-
-            let composed = await composeBlock(height);
-            memoizedBatchBlocks.set(getBlockHeight(composed), composed);
-            return composed;
-        }
-
-        let composeBlock = async (height: number): Promise<IndexerBlock> => {
-            // if (network.dataToFetch === "ONLY_HEIGHT")
-            //     return height;
-
-            let block = await api.fetchBlock(height);
-
-            if (network.dataToFetch === "RAW_TXS")
-                return block;
-
-            if (network.dataToFetch === "INDEXED_TXS")
-                return {
-                    ...block,
-                    txs: block.txs.length === 0 ? [] : await api.fetchIndexedTxs(height, block.header.chainId)
-                } as IndexedBlock;
-
-            return block;
-        }
+        let composer = new BatchComposer(network, api, storage);
 
         let cachingUpNetwork = false;
         let firstLoop = true;
         while (true) {
             if (firstLoop && network.fromBlock)
-                logger.trace(`Running network ${network.name} from block ${network.fromBlock}`);
+                logger.info(`Running network ${network.name} from block ${network.fromBlock}`);
 
             if (!cachingUpNetwork) {
                 latestHeight = await api.fetchLatestHeight(nextHeight);
@@ -150,7 +124,7 @@ export class BlocksWatcher {
                     latestHeight = Math.max(latestHeight - network.lag, 1);
 
                 if (firstLoop)
-                    logger.trace(`Latest ${network.name} height is ${latestHeight}` +
+                    logger.info(`Latest ${network.name} height is ${latestHeight}` +
                         (network.lag && network.lag > 0 ? ` with lag ${network.lag}` : ""));
                 firstLoop = false;
             }
@@ -165,26 +139,10 @@ export class BlocksWatcher {
                 nextHeight = latestHeight;
             }
 
-            let targetBlocks = [...Array(this.maxBlocksInBatch).keys()]
-                .map(i => i + nextHeight)
-                .filter(x => x <= latestHeight);
-
-            let blockResults = await Promise.allSettled(
-                targetBlocks.map(async (num) => await getBlock(num))
-            );
-
-            blockResults
-                .filter(isRejected)
-                .forEach(x =>
-                    logger.warn(`targetBlocks ${targetBlocks.at(0)}-${targetBlocks.at(-1)} rejection reason: ${x.reason}`)
-                )
-
-            let blocks = blockResults
-                .map(b => (b as PromiseFulfilledResult<IndexerBlock>)?.value)
-                .sort((a, b) => getBlockHeight(a) > getBlockHeight(b) ? 1 : -1);
+            let blocks = await composer.compose(nextHeight, this.maxBlocksInBatch, latestHeight);
 
             for (const block of blocks) {
-                if (getBlockHeight(block) !== nextHeight)
+                if (block.header.height !== nextHeight)
                     break;
 
                 try {
@@ -196,11 +154,10 @@ export class BlocksWatcher {
             }
 
             cachingUpNetwork = nextHeight < latestHeight;
-            if (memoizedBatchBlocks.size > this.maxBlocksInBatch * 2)
-                memoizedBatchBlocks.clear();
 
-            if (!cachingUpNetwork)
+            if (!cachingUpNetwork) {
                 await new Promise(res => setTimeout(res, INTERVALS.second * 10));
+            }
         }
     }
 
@@ -217,12 +174,22 @@ export class BlocksWatcher {
         await api.watchLatestHeight(async (newStatus) => {
             if (!currentStatus || newStatus.syncInfo.latestBlockHeight > currentStatus.syncInfo.latestBlockHeight) {
                 currentStatus = newStatus;
+
+                let block: IndexerBlock = {
+                    id: "",
+                    header: {
+                        chainId: newStatus.nodeInfo.network,
+                        height: newStatus.syncInfo.latestBlockHeight,
+                        time: new Date(newStatus.syncInfo.latestBlockTime.getTime()).toISOString(),
+                        version: { app: "", block: "" },
+                    },
+                    txs: [],
+                    type: "ONLY_HEIGHTS"
+                };
+
                 await network.onDataRecievedCallback(
                     { chain: chainData },
-                    [
-                        newStatus.syncInfo.latestBlockHeight,
-                        new Date(newStatus.syncInfo.latestBlockTime.getTime())
-                    ]
+                    block
                 );
             }
         })
@@ -267,14 +234,12 @@ export interface LogsWatcherContext {
 
 export type DataToFetch = "RAW_TXS" | "INDEXED_TXS" | "ONLY_HEIGHTS";
 
-export type IndexerBlock = Block | IndexedBlock | [height: number, date: Date];
+export type IndexerBlock = (Block & BlockType) | (BlockWithIndexedTxs & BlockType);
+
+export type BlockType = { type: DataToFetch };
 
 export type LogsWatcherData = IndexedTx[];
 
-export interface IndexedBlock extends Omit<Block, "txs"> {
+export interface BlockWithIndexedTxs extends Omit<Block, "txs"> {
     txs: IndexedTx[]
-}
-
-function getBlockHeight(block: IndexerBlock) {
-    return Array.isArray(block) ? block[0] : block.header.height;
 }

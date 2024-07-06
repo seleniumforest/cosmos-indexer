@@ -1,6 +1,6 @@
 # Self-hosted indexer for Cosmos SDK based blockchains
 
-Iterates blocks from given height and catches up latest blocks. Takes every block header and/or transactions, and passes it to your handler. Works with multiple RPCs from chain-registry, balancing between them, or with your own prioritized RPC. Optionally, caches blocks into your db to reindex data faster.
+Iterates blocks from given height and catches up latest blocks. Takes every block header and/or transactions, and passes it to your handler. Works with multiple RPCs from chain-registry, balancing between them, or with your own prioritized RPC. Optionally, caches blocks into your db to reindex data faster (+ removes ibc-proofs from txs).
 
 ## Project status
 
@@ -59,8 +59,7 @@ import { BlocksWatcher, IndexedBlock } from "cosmos-indexer";
 
             //now you can handle block with txs, how you want
             //if dataToFetch set to "INDEXED_TXS", cast block to "as IndexedBlock" 
-            //if dataToFetch set to "RAW_TXS", cast block to "as Block"
-            //if dataToFetch set to "ONLY_HEIGHT", cast block to tuple "as [number, Date]"  
+            //if dataToFetch set to "RAW_TXS" or "ONLY_HEIGHT", cast block to "as Block"
             onDataRecievedCallback: async (ctx, block) => {
                 let b = block as IndexedBlock;
                 console.log(ctx.chain.chain_name, b.header.height, b.txs.map((x: any) => x.hash))
