@@ -3,22 +3,22 @@ import { Block, IndexedTx } from '@cosmjs/stargate';
 import { Chain } from '@chain-registry/types';
 import { chains } from 'chain-registry';
 import assert from 'assert';
-import { DataSource, DataSourceOptions } from 'typeorm';
-import { IndexerStorage, CachedBlock } from './storage';
-import { INTERVALS, isRejected, logger } from './helpers';
+import { IndexerStorage } from './storage';
+import { INTERVALS, logger } from './helpers';
 import { StatusResponse } from '@cosmjs/tendermint-rpc';
 import { BatchComposer } from './batchComposer';
+import { MongoConnectionOptions } from 'typeorm/driver/mongodb/MongoConnectionOptions';
+import { DecodedTxRaw } from '@cosmjs/proto-signing';
 
 export class BlocksWatcher {
     chains: BlocksWatcherNetwork[] = [];
     apis: Map<string, ApiManager> = new Map();
     maxBlocksInBatch: number = 1;
     fetchChainRegistryRpcs: boolean;
-    opts?: DataSourceOptions;
+    cachingOpts: CachingOptions;
 
     //Builder section
-    private constructor() {
-    }
+    private constructor() { }
 
     static create(): BlocksWatcher {
         let ind = new BlocksWatcher();
@@ -59,22 +59,23 @@ export class BlocksWatcher {
         return this;
     }
 
-    useBlockCache(opts: DataSourceOptions) {
-        this.opts = opts;
+    useBlockCache(opts: CachingOptions) {
+        this.cachingOpts = opts;
         return this;
     }
 
+    //for compatibility
+    run = this.start;
+
     //Execution section
-    async run(): Promise<void> {
+    async start(): Promise<void> {
         let chainWorkerDelegate = async (network: BlocksWatcherNetwork) => {
             while (true) {
                 try {
-                    let storage;
-
-                    if (this.opts) {
+                    if (this.cachingOpts)
                         logger.trace(`Initializing DB...`);
-                        storage = new IndexerStorage(this.opts);
-                    }
+
+                    let storage = await IndexerStorage.create(this.cachingOpts);
 
                     let apiManager = await ApiManager.createApiManager(
                         network,
@@ -98,7 +99,7 @@ export class BlocksWatcher {
         await Promise.allSettled(chainWorkers);
     }
 
-    async runNetwork(network: BlocksWatcherNetwork, storage?: IndexerStorage): Promise<void> {
+    async runNetwork(network: BlocksWatcherNetwork, storage: IndexerStorage): Promise<void> {
         let chainData = chains.find(x => x.chain_name === network.name);
         if (!chainData) {
             let message = `Unknown chain ${network.name}`;
@@ -109,11 +110,10 @@ export class BlocksWatcher {
         let api = this.apis.get(network.name)!;
         let nextHeight = network.fromBlock ? (network.fromBlock || 1) : 0;
         let latestHeight: number = -1;
-
         let composer = new BatchComposer(network, api, storage);
-
         let cachingUpNetwork = false;
         let firstLoop = true;
+
         while (true) {
             if (firstLoop && network.fromBlock)
                 logger.info(`Running network ${network.name} from block ${network.fromBlock}`);
@@ -149,7 +149,7 @@ export class BlocksWatcher {
                     await network.onDataRecievedCallback({ chain: chainData }, block);
                     nextHeight++;
                 } catch (e: any) {
-                    throw new Error("Error executing callback " + e?.message + "\n" + e?.stack)
+                    throw new Error(`Error executing callback err ${JSON.stringify(e)}`)
                 }
             }
 
@@ -172,28 +172,37 @@ export class BlocksWatcher {
         let api = this.apis.get(network.name)!;
         let currentStatus: StatusResponse | null = null;
         await api.watchLatestHeight(async (newStatus) => {
-            if (!currentStatus || newStatus.syncInfo.latestBlockHeight > currentStatus.syncInfo.latestBlockHeight) {
-                currentStatus = newStatus;
-
-                let block: IndexerBlock = {
-                    id: "",
-                    header: {
-                        chainId: newStatus.nodeInfo.network,
-                        height: newStatus.syncInfo.latestBlockHeight,
-                        time: new Date(newStatus.syncInfo.latestBlockTime.getTime()).toISOString(),
-                        version: { app: "", block: "" },
-                    },
-                    txs: [],
-                    type: "ONLY_HEIGHTS"
-                };
-
-                await network.onDataRecievedCallback(
-                    { chain: chainData },
-                    block
-                );
+            let isBlockFresh = !currentStatus ||
+                newStatus.syncInfo.latestBlockHeight > currentStatus.syncInfo.latestBlockHeight;
+            if (!isBlockFresh) {
+                return;
             }
+
+            currentStatus = newStatus;
+
+            let block: IndexerBlock = {
+                id: new TextDecoder('utf-8').decode(newStatus.syncInfo.latestBlockHash),
+                header: {
+                    chainId: newStatus.nodeInfo.network,
+                    height: newStatus.syncInfo.latestBlockHeight,
+                    time: new Date(newStatus.syncInfo.latestBlockTime.getTime()).toISOString(),
+                    version: { app: "", block: "" },
+                },
+                txs: [],
+                type: "ONLY_HEIGHTS"
+            };
+
+            await network.onDataRecievedCallback(
+                { chain: chainData },
+                block
+            );
         })
     }
+}
+
+export type CachingOptions = MongoConnectionOptions & {
+    enabled: boolean,
+    trimIbcProofs?: boolean
 }
 
 export type Network = {
@@ -234,12 +243,23 @@ export interface LogsWatcherContext {
 
 export type DataToFetch = "RAW_TXS" | "INDEXED_TXS" | "ONLY_HEIGHTS";
 
-export type IndexerBlock = (Block & BlockType) | (BlockWithIndexedTxs & BlockType);
+export type IndexerBlock =
+    BlockWithDecodedTxs |
+    BlockWithIndexedTxs |
+    (Block & { type: "ONLY_HEIGHTS" });
+
 
 export type BlockType = { type: DataToFetch };
 
 export type LogsWatcherData = IndexedTx[];
 
+export interface BlockWithDecodedTxs extends Omit<Block, "txs"> {
+    type: "RAW_TXS",
+    rawTxs: DecodedTxRaw[]
+}
+
 export interface BlockWithIndexedTxs extends Omit<Block, "txs"> {
-    txs: IndexedTx[]
+    type: "INDEXED_TXS",
+    rawTxs: DecodedTxRaw[]
+    indexedTxs: IndexedTx[]
 }

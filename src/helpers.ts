@@ -20,57 +20,8 @@ export async function awaitWithTimeout<T>(promise: Promise<T>, timeoutMs: number
     return Promise.race([promise, timeoutPromise]);
 }
 
-// export function serializeBlock(block: IndexerBlock): string {
-//     if (block.type === "RAW_TXS") {
-//         return JSON.stringify({
-//             ...block,
-//             txs: block.txs.map(x => x.toString())
-//         })
-//     }
-
-//     if (block.type === "INDEXED_TXS") {
-//         let b = block as (BlockWithIndexedTxs);
-//         return JSON.stringify({
-//             ...b,
-//             txs: b.txs.map(tx => ({
-//                 ...tx,
-//                 gasUsed: tx.gasUsed.toString(),
-//                 gasWanted: tx.gasWanted.toString(),
-//                 tx: uint8ArrayToBase64(tx.tx),
-//                 //we dont serialize rawlog if events are filled. Otherwise, keep it as is for older versions of cosmos sdk
-//                 rawLog: Array.isArray(tx.events) && tx.events.length > 0 ? "" : tx.rawLog
-//             }))
-//         })
-//     }
-
-//     return JSON.stringify(block);
-// }
-
-// export function deserializeBlock(block: string) {
-//     let obj = JSON.parse(block) as IndexerBlock;
-
-//     if (obj.type === "RAW_TXS") {
-//         return {
-//             ...obj,
-//             txs: obj.txs.map((x: any) => base64ToUint8Array(x))
-//         } as IndexerBlock
-//     }
-
-//     if (obj.type === "INDEXED_TXS") {
-//         return {
-//             ...obj,
-//             txs: obj.txs.map((x: any) => {
-//                 debugger;
-//                 return {
-
-//                 }
-//             })
-//         }
-//     }
-// }
-
 export function serializeObject(obj: any) {
-    function replacer(key: any, value: any) {
+    function replacer(_key: any, value: any) {
         if (value instanceof Uint8Array) {
             return { type: 'Uint8Array', data: Buffer.from(value).toString('base64') };
         }
@@ -84,7 +35,7 @@ export function serializeObject(obj: any) {
 }
 
 export function deserializeObject<T>(jsonString: string) {
-    function reviver(key: any, value: any) {
+    function reviver(_key: any, value: any) {
         if (value && typeof value === 'object' && value.type === 'Uint8Array') {
             return new Uint8Array(Buffer.from(value.data, 'base64'));
         }
@@ -95,24 +46,6 @@ export function deserializeObject<T>(jsonString: string) {
     }
 
     return JSON.parse(jsonString, reviver) as T;
-}
-
-function uint8ArrayToBase64(uint8Array: Uint8Array) {
-    let binary = '';
-    const len = uint8Array.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(uint8Array[i]);
-    }
-    return btoa(binary);
-}
-function base64ToUint8Array(base64String: string) {
-    const binary = atob(base64String);
-    const len = binary.length;
-    const uint8Array = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        uint8Array[i] = binary.charCodeAt(i);
-    }
-    return uint8Array;
 }
 
 const second = 1000;
