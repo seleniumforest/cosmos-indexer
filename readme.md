@@ -53,9 +53,9 @@ import { BlocksWatcher, BlockWithIndexedTxs } from "../blocksWatcher";
             //default 0
             lag: 10,
             //now you can handle block with txs, how you want
-            //if dataToFetch set to "INDEXED_TXS", cast block to "as IndexedBlock" 
-            //if dataToFetch set to "RAW_TXS", cast block to "as Block"
-            //if dataToFetch set to "ONLY_HEIGHT", cast block to tuple "as [number, Date]"  
+            //if dataToFetch set to "INDEXED_TXS", cast block to "as BlockWithIndexedTxs" 
+            //if dataToFetch set to "RAW_TXS", cast block to "as BlockWithDecodedTxs"
+            //if dataToFetch set to "ONLY_HEIGHT", cast block to tuple "as Block"  
             onDataRecievedCallback: async (ctx, block) => {
                 let b = block as BlockWithIndexedTxs;
                 console.log(ctx.chain.chain_name, b.header.height, b.txs.map((x: any) => x.hash))
