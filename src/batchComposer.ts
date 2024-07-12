@@ -55,13 +55,13 @@ export class BatchComposer {
 
         if (this.network.dataToFetch === "INDEXED_TXS") {
             //do not search txs if there's 0 txs shown in block header
-            let resultTxs = block.rawTxs.length === 0 ?
+            let resultTxs = block.txs.length === 0 ?
                 [] :
                 await this.api.fetchIndexedTxs(block.header.height, block.header.chainId);
 
             return {
                 ...block,
-                indexedTxs: resultTxs,
+                txs: resultTxs,
                 type: "INDEXED_TXS"
             } as BlockWithIndexedTxs;
         }

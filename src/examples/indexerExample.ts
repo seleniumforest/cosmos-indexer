@@ -26,7 +26,7 @@ import { BlocksWatcher, BlockWithIndexedTxs } from "../blocksWatcher";
             //if dataToFetch set to "ONLY_HEIGHT", cast block to tuple "as Block"  
             onDataRecievedCallback: async (ctx, block) => {
                 let b = block as BlockWithIndexedTxs;
-                console.log(ctx.chain.chain_name, b.header.height, b.indexedTxs.map((x: any) => x.hash))
+                console.log(ctx.chain.chain_name, b.header.height, b.txs.map((x: any) => x.hash))
             }
         })
         //block cache, in case if you need to reindex data in future

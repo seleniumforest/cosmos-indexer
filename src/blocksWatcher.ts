@@ -253,13 +253,16 @@ export type BlockType = { type: DataToFetch };
 
 export type LogsWatcherData = IndexedTx[];
 
+export type DecodedTxRawFull = Omit<IndexedTx, "tx"> & {
+    tx: DecodedTxRaw
+}
+
 export interface BlockWithDecodedTxs extends Omit<Block, "txs"> {
     type: "RAW_TXS",
-    rawTxs: DecodedTxRaw[]
+    txs: DecodedTxRaw[]
 }
 
 export interface BlockWithIndexedTxs extends Omit<Block, "txs"> {
     type: "INDEXED_TXS",
-    rawTxs: DecodedTxRaw[]
-    indexedTxs: IndexedTx[]
+    txs: DecodedTxRawFull[]
 }

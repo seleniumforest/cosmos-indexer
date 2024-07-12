@@ -1,6 +1,5 @@
-import { IndexedTx } from "@cosmjs/stargate"
 import { Entity, Column, ObjectId, Index, DataSource, ObjectIdColumn } from "typeorm"
-import { BlockWithDecodedTxs, CachingOptions } from "./blocksWatcher"
+import { BlockWithDecodedTxs, CachingOptions, DecodedTxRawFull } from "./blocksWatcher"
 import { deserializeObject, serializeObject } from "./helpers"
 
 @Entity()
@@ -100,12 +99,12 @@ export class IndexerStorage {
         let cached = await repo.findOne({ where: { height } });
 
         if (cached) {
-            let result = deserializeObject<IndexedTx[]>(cached.data);
+            let result = deserializeObject<DecodedTxRawFull[]>(cached.data);
             return result;
         }
     }
 
-    async saveTxs(txs: IndexedTx[], height: number, chainId: string) {
+    async saveTxs(txs: DecodedTxRawFull[], height: number, chainId: string) {
         if (!this.options.enabled) return;
 
         let repo = this.dataSource.getRepository(CachedTxs);
