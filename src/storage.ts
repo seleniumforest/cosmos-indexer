@@ -1,4 +1,4 @@
-import { Entity, Column, ObjectId, Index, DataSource, ObjectIdColumn } from "typeorm"
+import { Entity, Column, ObjectId, Index, DataSource, ObjectIdColumn, createQueryBuilder, getMongoRepository } from "typeorm"
 import { BlockWithDecodedTxs, CachingOptions, DecodedTxRawFull } from "./blocksWatcher"
 import { deserializeObject, serializeObject } from "./helpers"
 
@@ -113,5 +113,21 @@ export class IndexerStorage {
             chainId,
             data: serializeObject(txs)
         });
+    }
+
+    async latestSavedHeight() {
+        if (!this.options.enabled) return;
+
+        let repo = this.dataSource.getMongoRepository(CachedBlock);
+        let max = await repo.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    maxHeight: { $max: "$height" }
+                }
+            }
+        ]).toArray()
+
+        return (max[0] as any).maxHeight;
     }
 }

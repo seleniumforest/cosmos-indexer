@@ -17,47 +17,56 @@ export class NetworkManager {
         network: Network,
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = NetworkManager.defaultSyncWindow,
-        clients: IndexerClient[]
+        clients: IndexerClient[],
+        cachingEnabled: boolean
     ) {
         this.network = network;
 
         if (clients.length === 0) {
-            let msg = "No rpcs found";
-            logger.error(msg);
-            throw new Error(msg);
+            if (cachingEnabled) {
+                let msg = "No rpcs found, but mongo caching is enabled, will try to take data from cache";
+                logger.warn(msg);
+            } else {
+                let msg = "No rpcs found";
+                logger.error(msg);
+                throw new Error(msg);
+            }
         }
 
         this.clients = clients;
 
         setInterval(() => this.logStatus(), INTERVALS.hour);
-        setInterval(() => {
-            (async () => {
-                logger.info("Updating rpcs...");
-                let newClients = await NetworkManager.fetchClients(network, addChainRegistryRpcs, syncWindow);
-                let newRpcSet = [...this.clients];
-                for (const newRpc of newClients) {
-                    if (!!newRpcSet.find(x => x.rpcUrl === newRpc.rpcUrl))
-                        continue;
+        if (addChainRegistryRpcs) {
+            setInterval(() => {
+                (async () => {
+                    logger.info("Updating rpcs...");
+                    let newClients = await NetworkManager.fetchClients(network, addChainRegistryRpcs, syncWindow);
+                    let newRpcSet = [...this.clients];
+                    for (const newRpc of newClients) {
+                        if (!!newRpcSet.find(x => x.rpcUrl === newRpc.rpcUrl))
+                            continue;
 
-                    newRpcSet.push(newRpc);
-                    logger.info(`New RPC ${newRpc.rpcUrl}`);
-                }
+                        newRpcSet.push(newRpc);
+                        logger.info(`New RPC ${newRpc.rpcUrl}`);
+                    }
 
-                this.clients = newRpcSet;
-                logger.info("Current Endpoint Set:", this.clients.map(x => x.rpcUrl))
-            })();
-        }, INTERVALS.day);
+                    this.clients = newRpcSet;
+                    logger.info("Current Endpoint Set:", this.clients.map(x => x.rpcUrl))
+                })();
+            }, INTERVALS.day);
+        }
     }
 
     static async create(
         network: Network,
         addChainRegistryRpcs: boolean = false,
         syncWindow: number = this.defaultSyncWindow,
-        logLvl: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 2
+        logLvl: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 2,
+        cachingEnabled: boolean = false
     ): Promise<NetworkManager> {
         logger.settings.minLevel = logLvl;
         let clients = await this.fetchClients(network, addChainRegistryRpcs, syncWindow);
-        return new NetworkManager(network, addChainRegistryRpcs, syncWindow, clients);
+        return new NetworkManager(network, addChainRegistryRpcs, syncWindow, clients, cachingEnabled);
     }
 
     static async fetchClients(

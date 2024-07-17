@@ -23,7 +23,7 @@ export class ApiManager {
         useChainRegistryRpcs: boolean = false,
         retryCounts?: number
     ) {
-        let networkManager = await NetworkManager.create(network, useChainRegistryRpcs);
+        let networkManager = await NetworkManager.create(network, useChainRegistryRpcs, undefined, 2, storage.options.enabled);
         return new ApiManager(networkManager, storage, retryCounts);
     }
 
@@ -46,6 +46,11 @@ export class ApiManager {
 
     async fetchLatestHeight(lastKnownHeight: number = 0): Promise<number> {
         let clients = this.manager.getClients();
+
+        if (clients.length === 0 && this.storage.options.enabled) {
+            let h = await this.storage.latestSavedHeight() || 1;
+            return h;
+        }
 
         let results = await Promise.allSettled(
             clients.map(client => awaitWithTimeout(client.getHeight(), INTERVALS.second * 10))
