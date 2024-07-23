@@ -7,31 +7,21 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "example",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${workspaceFolder}/src/example.ts",
-            "runtimeExecutable": "ts-node"
-        },
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "debug",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${workspaceFolder}/src/debug.ts",
-            "runtimeExecutable": "ts-node"
-        },
-        {
-            "type": "node",
-            "request": "launch",
             "name": "Debug Logs Watcher",
             "skipFiles": [
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}/src/LogsWatcher.debug.ts",
+            "runtimeExecutable": "ts-node"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Blocks Watcher",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "program": "${workspaceFolder}/src/BlocksWatcher.debug.ts",
             "runtimeExecutable": "ts-node"
         }
     ]

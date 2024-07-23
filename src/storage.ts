@@ -17,7 +17,7 @@ export class CachedBlock {
     @Column()
     chainId: string
 
-    @Column()
+    @Column({ type: "jsonb" })
     data: string
 }
 
@@ -33,7 +33,7 @@ export class CachedTxs {
     @Column()
     chainId: string
 
-    @Column()
+    @Column({ type: "jsonb" })
     data: string
 }
 
