@@ -7,12 +7,15 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Debug Logs Watcher",
+            "name": "Debug Block Watcher",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/src/LogsWatcher.debug.ts",
-            "runtimeExecutable": "ts-node"
+            "program": "${workspaceFolder}/src/BlocksWatcher.debug.ts",
+            "runtimeExecutable": "ts-node",
+            "runtimeArgs": [
+                "--transpile-only"
+            ]
         },
         {
             "type": "node",
@@ -21,8 +24,11 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/src/BlocksWatcher.debug.ts",
-            "runtimeExecutable": "ts-node"
+            "program": "${workspaceFolder}/src/LogsWatcher.debug.ts",
+            "runtimeExecutable": "ts-node",
+            "runtimeArgs": [
+                "--transpile-only"
+            ]
         }
     ]
 }

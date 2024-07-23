@@ -1,16 +1,17 @@
 import { NetworkManager } from "./networkManager";
 import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
-import { BlocksWatcherNetwork } from "./blocksWatcher";
-import { Block, IndexedTx, SearchTxQuery } from "@cosmjs/stargate";
+import { BlockWithDecodedTxs, BlocksWatcherNetwork, DecodedTxRawFull } from "./blocksWatcher";
+import { SearchTxQuery } from "@cosmjs/stargate";
 import { IndexerStorage } from "./storage";
 import { StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
+import { decodeAndTrimBlock, decodeAndTrimIndexedTxs } from "./decoder";
 
 export class ApiManager {
     protected readonly manager: NetworkManager;
-    protected readonly storage?: IndexerStorage;
+    protected readonly storage: IndexerStorage;
     protected readonly retryCounts: number;
 
-    protected constructor(manager: NetworkManager, storage?: IndexerStorage, retryCounts?: number) {
+    protected constructor(manager: NetworkManager, storage: IndexerStorage, retryCounts?: number) {
         this.retryCounts = retryCounts || 3;
         this.manager = manager;
         this.storage = storage;
@@ -18,11 +19,11 @@ export class ApiManager {
 
     static async createApiManager(
         network: BlocksWatcherNetwork,
-        storage?: IndexerStorage,
+        storage: IndexerStorage,
         useChainRegistryRpcs: boolean = false,
         retryCounts?: number
     ) {
-        let networkManager = await NetworkManager.create(network, useChainRegistryRpcs);
+        let networkManager = await NetworkManager.create(network, useChainRegistryRpcs, undefined, 2, storage.options.enabled);
         return new ApiManager(networkManager, storage, retryCounts);
     }
 
@@ -46,6 +47,11 @@ export class ApiManager {
     async fetchLatestHeight(lastKnownHeight: number = 0): Promise<number> {
         let clients = this.manager.getClients();
 
+        if (clients.length === 0 && this.storage.options.enabled) {
+            let h = await this.storage.latestSavedHeight() || 1;
+            return h;
+        }
+
         let results = await Promise.allSettled(
             clients.map(client => awaitWithTimeout(client.getHeight(), INTERVALS.second * 10))
         );
@@ -62,8 +68,8 @@ export class ApiManager {
         return result;
     }
 
-    async fetchBlock(height: number): Promise<Block> {
-        let cached = this.storage && await this.storage.getBlockByHeight(height);
+    async fetchBlock(height: number): Promise<BlockWithDecodedTxs> {
+        let cached = await this.storage.getBlockByHeight(height);
         if (cached) return cached;
 
         let clients = this.manager.getClients(true);
@@ -75,7 +81,7 @@ export class ApiManager {
 
             for (const client of clients) {
                 try {
-                    response = await awaitWithTimeout(client.getBlock(height), INTERVALS.second * 10);
+                    response = await awaitWithTimeout(client.getBlock(height), INTERVALS.second * 15);
                     break;
                 } catch (err: any) {
                     let msg = `Error fetching block header on height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error : ${err}`;
@@ -90,20 +96,23 @@ export class ApiManager {
             return Promise.reject();
         }
 
-        this.storage && await this.storage.saveBlock(response);
+        let trimmed = decodeAndTrimBlock(response, this.storage.options.trimIbcProofs || false);
 
-        return response;
+        await this.storage.saveBlock(trimmed);
+        return trimmed;
     }
 
-    async fetchIndexedTxs(height: number, chainId: string): Promise<readonly IndexedTx[]> {
-        let cached = this.storage && await this.storage.getTxsByHeight(height);
-        if (cached) return cached;
+    async fetchIndexedTxs(height: number, chainId: string): Promise<DecodedTxRawFull[]> {
+        let cached = await this.storage.getTxsByHeight(height)
+        if (cached && cached)
+            return cached;
 
         //keep 60s for fat blocks
         let response = await this.fetchTxsWithTimeout(`tx.height=${height}`, INTERVALS.second * 60);
 
-        this.storage && await this.storage.saveTxs(response, height, chainId)
-        return response;
+        let trimmed = decodeAndTrimIndexedTxs(response, this.storage.options.trimIbcProofs || false);
+        await this.storage.saveTxs(trimmed, height, chainId);
+        return trimmed;
     }
 
     async fetchSearchTxs(query: SearchTxQuery) {

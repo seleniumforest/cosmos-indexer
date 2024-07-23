@@ -1,11 +1,11 @@
-import { IndexedTx } from "@cosmjs/stargate"
-import { Block } from "@cosmjs/stargate"
-import { Entity, Column, PrimaryGeneratedColumn, Index, DataSource, DataSourceOptions } from "typeorm"
+import { Entity, Column, ObjectId, Index, DataSource, ObjectIdColumn, createQueryBuilder, getMongoRepository } from "typeorm"
+import { BlockWithDecodedTxs, CachingOptions, DecodedTxRawFull } from "./blocksWatcher"
+import { deserializeObject, serializeObject } from "./helpers"
 
 @Entity()
 export class CachedBlock {
-    @PrimaryGeneratedColumn()
-    id: number
+    @ObjectIdColumn()
+    id: ObjectId
 
     @Column()
     @Index({ unique: true })
@@ -23,8 +23,8 @@ export class CachedBlock {
 
 @Entity()
 export class CachedTxs {
-    @PrimaryGeneratedColumn()
-    id: number
+    @ObjectIdColumn()
+    id: ObjectId
 
     @Column()
     @Index({ unique: true })
@@ -37,81 +37,97 @@ export class CachedTxs {
     data: string
 }
 
-export class IndexerStorage {
-    //null means caching is not enabled
-    dataSource?: DataSource;
+const defaultOpts: CachingOptions = {
+    type: "mongodb",
+    trimIbcProofs: false,
+    enabled: false
+}
 
-    public constructor(opts?: DataSourceOptions) {
-        if (opts) {
-            this.dataSource = new DataSource({
+export class IndexerStorage {
+    public options: CachingOptions;
+    private dataSource: DataSource;
+
+    private constructor(ds?: DataSource, opts?: CachingOptions) {
+        if (ds) {
+            this.dataSource = ds;
+        }
+        this.options = opts || { ...defaultOpts };
+    }
+
+    public static async create(opts?: CachingOptions) {
+        if (opts && opts?.enabled) {
+            let dataSource = new DataSource({
                 ...opts,
                 synchronize: true,
                 entities: [CachedBlock, CachedTxs]
             });
-            this.dataSource.initialize();
-        }
+
+            await dataSource.initialize();
+            return new IndexerStorage(dataSource, opts);
+        };
+
+        return new IndexerStorage(undefined, opts);
     }
 
     async getBlockByHeight(height: number) {
-        if (!this.dataSource) return;
+        if (!this.options.enabled) return;
 
         let repo = this.dataSource.getRepository(CachedBlock);
         let cached = await repo.findOne({ where: { height } });
         if (cached) {
-            let obj = JSON.parse(cached.data) as Block & { txs: string[] };
-            return {
-                ...obj,
-                txs: obj.txs.map((x: any) => new Uint8Array(x.split(",").map((ch: any) => +ch)))
-            }
+            let result = deserializeObject<BlockWithDecodedTxs>(cached.data);
+            return result;
         }
     }
 
-    async saveBlock(block: Block) {
-        if (!this.dataSource) return;
+    async saveBlock(block: BlockWithDecodedTxs) {
+        if (!this.options.enabled) return;
 
         let repo = this.dataSource.getRepository(CachedBlock);
         await repo.save({
             chainId: block.header.chainId,
             height: block.header.height,
             time: new Date(block.header.time),
-            data: JSON.stringify({
-                ...block,
-                txs: block.txs.map(x => x.toString())
-            })
+            data: serializeObject(block)
         });
     }
 
     async getTxsByHeight(height: number) {
-        if (!this.dataSource) return;
+        if (!this.options.enabled) return;
 
         let repo = this.dataSource.getRepository(CachedTxs);
         let cached = await repo.findOne({ where: { height } });
 
         if (cached) {
-            let obj = JSON.parse(cached.data) as (IndexedTx & { tx: string })[];
-
-            return obj.map((x) => ({
-                ...x,
-                gasUsed: BigInt(x.gasUsed),
-                gasWanted: BigInt(x.gasWanted),
-                tx: new Uint8Array(x.tx.split(",").map((ch) => +ch))
-            } as IndexedTx))
+            let result = deserializeObject<DecodedTxRawFull[]>(cached.data);
+            return result;
         }
     }
 
-    async saveTxs(txs: IndexedTx[], height: number, chainId: string) {
-        if (!this.dataSource) return;
+    async saveTxs(txs: DecodedTxRawFull[], height: number, chainId: string) {
+        if (!this.options.enabled) return;
 
         let repo = this.dataSource.getRepository(CachedTxs);
         await repo.save({
             height,
             chainId,
-            data: JSON.stringify(txs.map(x => ({
-                ...x,
-                gasUsed: x.gasUsed.toString(),
-                gasWanted: x.gasWanted.toString(),
-                tx: x.tx.toString()
-            })))
+            data: serializeObject(txs)
         });
+    }
+
+    async latestSavedHeight() {
+        if (!this.options.enabled) return;
+
+        let repo = this.dataSource.getMongoRepository(CachedBlock);
+        let max = await repo.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    maxHeight: { $max: "$height" }
+                }
+            }
+        ]).toArray()
+
+        return (max[0] as any).maxHeight;
     }
 }

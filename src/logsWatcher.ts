@@ -3,14 +3,14 @@ import { ApiManager } from "./apiManager";
 import { BlocksWatcherNetwork, LogsWatcherNetwork } from "./blocksWatcher";
 import { INTERVALS, logger } from "./helpers";
 import { chains } from "chain-registry";
+import { IndexerStorage } from "./storage";
 
 export class LogsWatcher {
     chains: (LogsWatcherNetwork & { searchKeys: SearchPair[] })[] = [];
     apis: Map<string, ApiManager> = new Map();
     fetchChainRegistryRpcs: boolean;
 
-    private constructor() {
-    }
+    private constructor() { }
 
     static create(): LogsWatcher {
         let ind = new LogsWatcher();
@@ -48,7 +48,7 @@ export class LogsWatcher {
             try {
                 let apiManager = await ApiManager.createApiManager(
                     network as any as BlocksWatcherNetwork,
-                    undefined,
+                    await IndexerStorage.create(),
                     this.fetchChainRegistryRpcs
                 );
                 this.apis.set(network.name, apiManager);

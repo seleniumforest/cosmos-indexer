@@ -1,4 +1,4 @@
-import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
+import { BlocksWatcher, BlockWithIndexedTxs } from "../blocksWatcher";
 
 (async () => {
     await BlocksWatcher
@@ -21,29 +21,27 @@ import { BlocksWatcher, IndexedBlock } from "../blocksWatcher";
             //default 0
             lag: 10,
             //now you can handle block with txs, how you want
-            //if dataToFetch set to "INDEXED_TXS", cast block to "as IndexedBlock" 
-            //if dataToFetch set to "RAW_TXS", cast block to "as Block"
-            //if dataToFetch set to "ONLY_HEIGHT", cast block to tuple "as [number, Date]"  
+            //if dataToFetch set to "INDEXED_TXS", cast block to "as BlockWithIndexedTxs" 
+            //if dataToFetch set to "RAW_TXS", cast block to "as BlockWithDecodedTxs"
+            //if dataToFetch set to "ONLY_HEIGHT", cast block to tuple "as Block"  
             onDataRecievedCallback: async (ctx, block) => {
-                let b = block as IndexedBlock;
+                let b = block as BlockWithIndexedTxs;
                 console.log(ctx.chain.chain_name, b.header.height, b.txs.map((x: any) => x.hash))
             }
         })
         //block cache, in case if you need to reindex data in future
-        //typeorm datasourceoptions object https://orkhan.gitbook.io/typeorm/docs/data-source-options 
+        //typeorm mongodatasourceoptions object 
+        //https://orkhan.gitbook.io/typeorm/docs/data-source-options#mongodb-data-source-options
         .useBlockCache({
-            type: "postgres",
-            host: "localhost",
-            port: 5432,
-            username: "postgres",
-            password: "1",
-            database: "index",
-            schema: "public",
-            synchronize: true
+            type: "mongodb",
+            enabled: true,
+            //removes useless update_client logs and ics23:iavl data from txs
+            trimIbcProofs: true,
+            url: "mongodb://localhost:27017/"
         })
         //it will fetch from chain-registry 
         .useChainRegistryRpcs()
         //if fromBlock specified, it will fetch 5 block in parallel, please don't use large batches, rpc could throw 429's 
         .useBatchFetching(5)
-        .run()
+        .start()
 })();
