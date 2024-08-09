@@ -4,7 +4,20 @@ Iterates blocks from given height and catches up latest blocks. Takes every bloc
 
 ## Project status
 
-Core features are stable (iterating over blocks, working with chain-registry) in production. Secondary features need some testing. Also, needs to add decoding txs feature, and make better types before i make docker/k8s configs to run this as persistent app. That's will be "1.0" version.
+Core features are stable (iterating over blocks, working with chain-registry) in production. Secondary features need some testing. 
+
+Roadmap to "1.0" version: 
+
+    - Split into 2 parts - data fetcher and executor, so they can work asynchronously. First will responsible to deliver data from pool of RPCs, and second will apply this data to user's callback. 
+    - Better types, so user won't need to cast objects in callback
+    - Make Dockerfile and feature to build watchers from config
+    - Depinjection
+    - User should pass only typeUrl and event type/key he would like to watch, with callback.
+
+Future ideas: 
+
+    - Create a web interface with monitoring
+
 
 ## Usecases
 

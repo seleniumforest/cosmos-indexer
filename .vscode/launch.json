@@ -11,7 +11,7 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/src/BlocksWatcher.debug.ts",
+            "program": "${workspaceFolder}/src/blocksWatcher.debug.ts",
             "runtimeExecutable": "ts-node",
             "runtimeArgs": [
                 "--transpile-only"
@@ -20,11 +20,11 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "Debug Blocks Watcher",
+            "name": "Debug logs Watcher",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/src/LogsWatcher.debug.ts",
+            "program": "${workspaceFolder}/src/logsWatcher.debug.ts",
             "runtimeExecutable": "ts-node",
             "runtimeArgs": [
                 "--transpile-only"

@@ -22,7 +22,7 @@ export class CachedBlock {
 }
 
 @Entity()
-export class CachedTxs {
+export class CachedBlockResult {
     @ObjectIdColumn()
     id: ObjectId
 
@@ -59,7 +59,7 @@ export class IndexerStorage {
             let dataSource = new DataSource({
                 ...opts,
                 synchronize: true,
-                entities: [CachedBlock, CachedTxs]
+                entities: [CachedBlock, CachedBlockResult]
             });
 
             await dataSource.initialize();
@@ -92,10 +92,10 @@ export class IndexerStorage {
         });
     }
 
-    async getTxsByHeight(height: number) {
+    async getBlockResultByHeight(height: number) {
         if (!this.options.enabled) return;
 
-        let repo = this.dataSource.getRepository(CachedTxs);
+        let repo = this.dataSource.getRepository(CachedBlockResult);
         let cached = await repo.findOne({ where: { height } });
 
         if (cached) {
@@ -104,10 +104,10 @@ export class IndexerStorage {
         }
     }
 
-    async saveTxs(txs: DecodedTxRawFull[], height: number, chainId: string) {
+    async saveBlockResults(txs: DecodedTxRawFull[], height: number, chainId: string) {
         if (!this.options.enabled) return;
 
-        let repo = this.dataSource.getRepository(CachedTxs);
+        let repo = this.dataSource.getRepository(CachedBlockResult);
         await repo.save({
             height,
             chainId,

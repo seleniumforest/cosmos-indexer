@@ -1,37 +1,42 @@
 import { Block, IndexedTx, SearchTxQuery, StargateClient } from "@cosmjs/stargate";
 import { logger } from "./helpers";
+import { CometClient, connectComet } from "@cosmjs/tendermint-rpc";
 
-export class IndexerClient {
-    client: StargateClient;
+export class IndexerClient extends StargateClient {
     ok: number = 0;
     fail: number = 0;
-    rpcUrl: string = "";
+    rpcUrl: string;
     priority: boolean = false;
 
-    private constructor(client: StargateClient, opts: ClientOptions) {
+    private constructor(client: CometClient, opts: ClientOptions) {
+        super(client, {});
         this.rpcUrl = opts.rpcUrl;
         this.priority = opts.priority;
-        this.client = client;
     }
 
     static async createClient(opts: ClientOptions): Promise<IndexerClient> {
-        let client = await StargateClient.connect(opts.rpcUrl);
+        let client = await connectComet(opts.rpcUrl);
         return new IndexerClient(client, opts);
     }
 
     async getBlock(height?: number | undefined): Promise<Block> {
         logger.silly(`Trying to fetch block ${height} from ${this.rpcUrl}`)
-        return await this.useResultReporting(() => this.client.getBlock(height));
+        return await this.useResultReporting(() => super.getBlock(height));
+    }
+
+    async getBlockResults(height?: number | undefined): Promise<Block> {
+        logger.silly(`Trying to fetch block ${height} from ${this.rpcUrl}`)
+        return await this.useResultReporting(() => super.forceGetCometClient().blockResults(height));
     }
 
     async searchTx(query: SearchTxQuery): Promise<IndexedTx[]> {
-        logger.silly(`Trying to search txs ${JSON.stringify(query)} from ${this.rpcUrl}`)
-        return await this.useResultReporting(() => this.client.searchTx(query));
+        logger.silly(`Trying to search txs ${JSON.stringify(query)} from ${this.rpcUrl}`);
+        return await this.useResultReporting(() => super.searchTx(query));
     }
 
     async getHeight(): Promise<number> {
         logger.silly(`Trying to get height from ${this.rpcUrl}`);
-        return await this.useResultReporting(() => this.client.getHeight());
+        return await this.useResultReporting(() => super.getHeight());
     }
 
     private async useResultReporting(func: any) {

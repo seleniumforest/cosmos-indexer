@@ -57,7 +57,7 @@ export class BatchComposer {
             //do not search txs if there's 0 txs shown in block header
             let resultTxs = block.txs.length === 0 ?
                 [] :
-                await this.api.fetchIndexedTxs(block.header.height, block.header.chainId);
+                await this.api.fetchBlockResults(block.header.height, block.header.chainId);
 
             return {
                 ...block,

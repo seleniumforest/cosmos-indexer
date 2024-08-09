@@ -102,8 +102,8 @@ export class ApiManager {
         return trimmed;
     }
 
-    async fetchIndexedTxs(height: number, chainId: string): Promise<DecodedTxRawFull[]> {
-        let cached = await this.storage.getTxsByHeight(height)
+    async fetchBlockResults(height: number, chainId: string): Promise<DecodedTxRawFull[]> {
+        let cached = await this.storage.getBlockResultByHeight(height)
         if (cached && cached)
             return cached;
 
@@ -111,7 +111,7 @@ export class ApiManager {
         let response = await this.fetchTxsWithTimeout(`tx.height=${height}`, INTERVALS.second * 60);
 
         let trimmed = decodeAndTrimIndexedTxs(response, this.storage.options.trimIbcProofs || false);
-        await this.storage.saveTxs(trimmed, height, chainId);
+        await this.storage.saveBlockResults(trimmed, height, chainId);
         return trimmed;
     }
 
@@ -128,7 +128,8 @@ export class ApiManager {
 
             for (const client of clients) {
                 try {
-                    return await awaitWithTimeout(client.searchTx(query), timeout);
+                    let result = await awaitWithTimeout(client.searchTx(query), timeout);
+                    return result;
                 } catch (err: any) {
                     let msg = `Failed searching txs with query ${query} in ${this.manager.network.name} rpc ${client.rpcUrl} error:`;
                     logger.warn(msg, err);

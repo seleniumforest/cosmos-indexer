@@ -1,4 +1,4 @@
-import { Block, IndexedTx } from "@cosmjs/stargate";
+import { Block, IndexedTx, Event } from "@cosmjs/stargate";
 import { BlockWithDecodedTxs, DecodedTxRawFull } from "./blocksWatcher";
 import { decodeTxRaw } from "@cosmjs/proto-signing";
 import { Any } from "cosmjs-types/google/protobuf/any";
@@ -37,7 +37,7 @@ export function decodeAndTrimBlock(block: Block, trim: boolean): BlockWithDecode
 }
 
 export function decodeAndTrimIndexedTxs(txs: IndexedTx[], trim: boolean): DecodedTxRawFull[] {
-    return txs
+    let result = txs
         .map(tx => ({
             tx: tx,
             decoded: decodeTxRaw(tx.tx)
@@ -72,8 +72,15 @@ export function decodeAndTrimIndexedTxs(txs: IndexedTx[], trim: boolean): Decode
                 decoded.body.messages = cleanMessages(decoded.body.messages);
 
             return {
-                ...tx,
-                tx: decoded
+                code: tx.code,
+                tx: decoded,
+                events: tx.events as Event[],
+                gasWanted: tx.gasWanted,
+                gasUsed: tx.gasUsed,
+                txIndex: tx.txIndex,
+                hash: tx.hash
             }
-        })
+        });
+
+    return result;
 }

@@ -1,5 +1,5 @@
 import { ApiManager } from './apiManager';
-import { Block, IndexedTx } from '@cosmjs/stargate';
+import { Block, IndexedTx, Event } from '@cosmjs/stargate';
 import { Chain } from '@chain-registry/types';
 import { chains } from 'chain-registry';
 import assert from 'assert';
@@ -253,8 +253,14 @@ export type BlockType = { type: DataToFetch };
 
 export type LogsWatcherData = IndexedTx[];
 
-export type DecodedTxRawFull = Omit<IndexedTx, "tx"> & {
-    tx: DecodedTxRaw
+export type DecodedTxRawFull = {
+    hash: string,
+    code: number;
+    tx: DecodedTxRaw;
+    events: Event[];
+    gasWanted: bigint;
+    gasUsed: bigint;
+    txIndex: number;
 }
 
 export interface BlockWithDecodedTxs extends Omit<Block, "txs"> {
