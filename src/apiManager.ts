@@ -3,8 +3,8 @@ import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { BlockWithDecodedTxs, BlocksWatcherNetwork, DecodedTxRawFull } from "./blocksWatcher";
 import { SearchTxQuery } from "@cosmjs/stargate";
 import { IndexerStorage } from "./storage";
-import { StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
-import { decodeAndTrimBlock, decodeAndTrimIndexedTxs } from "./decoder";
+import { BlockResultsResponse, StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
+import { decodeAndTrimBlock, trimBlockResults } from "./decoder";
 
 export class ApiManager {
     protected readonly manager: NetworkManager;
@@ -102,17 +102,21 @@ export class ApiManager {
         return trimmed;
     }
 
-    async fetchBlockResults(height: number, chainId: string): Promise<DecodedTxRawFull[]> {
+    async fetchBlockResults(height: number, chainId: string): Promise<BlockResultsResponse> {
         let cached = await this.storage.getBlockResultByHeight(height)
         if (cached && cached)
             return cached;
 
         //keep 60s for fat blocks
-        let response = await this.fetchTxsWithTimeout(`tx.height=${height}`, INTERVALS.second * 60);
+        let response = await this.fetchBlockResultsWithTimeout(height);
 
-        let trimmed = decodeAndTrimIndexedTxs(response, this.storage.options.trimIbcProofs || false);
-        await this.storage.saveBlockResults(trimmed, height, chainId);
-        return trimmed;
+        if (this.storage.options.trimIbcProofs)
+            response = trimBlockResults(response);
+
+        (response as any).beginBlockEvents = [];
+
+        await this.storage.saveBlockResults(response, height, chainId);
+        return response;
     }
 
     async fetchSearchTxs(query: SearchTxQuery) {
@@ -138,6 +142,29 @@ export class ApiManager {
         }
 
         let message = `Couldn't get transactions with query ${query} for network ${this.manager.network.name} with endpoints set`;
+        logger.error(message, clients.map(x => x.rpcUrl))
+        return Promise.reject();
+    }
+
+    private async fetchBlockResultsWithTimeout(height: number, timeout = INTERVALS.second * 10) {
+        let clients = this.manager.getClients(true);
+        let retryCount = 0;
+
+        while (retryCount <= this.retryCounts) {
+            retryCount++;
+
+            for (const client of clients) {
+                try {
+                    let result = await awaitWithTimeout(client.getBlockResults(height), timeout);
+                    return result;
+                } catch (err: any) {
+                    let msg = `Failed searching block results for height ${height} in ${this.manager.network.name} rpc ${client.rpcUrl} error:`;
+                    logger.warn(msg, err);
+                }
+            }
+        }
+
+        let message = `Couldn't get block results for height ${height} for network ${this.manager.network.name} with endpoints set`;
         logger.error(message, clients.map(x => x.rpcUrl))
         return Promise.reject();
     }

@@ -254,7 +254,7 @@ export type BlockType = { type: DataToFetch };
 export type LogsWatcherData = IndexedTx[];
 
 export type DecodedTxRawFull = {
-    hash: string,
+    height: number;
     code: number;
     tx: DecodedTxRaw;
     events: Event[];

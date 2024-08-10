@@ -1,5 +1,6 @@
+import { TxData } from "@cosmjs/tendermint-rpc";
 import { ApiManager } from "./apiManager";
-import { BlockWithDecodedTxs, BlockWithIndexedTxs, IndexerBlock, Network } from "./blocksWatcher";
+import { BlockWithDecodedTxs, BlockWithIndexedTxs, DecodedTxRawFull, IndexerBlock, Network } from "./blocksWatcher";
 import { isRejected, logger } from "./helpers";
 import { IndexerStorage } from "./storage";
 
@@ -57,17 +58,43 @@ export class BatchComposer {
             //do not search txs if there's 0 txs shown in block header
             let resultTxs = block.txs.length === 0 ?
                 [] :
-                await this.api.fetchBlockResults(block.header.height, block.header.chainId);
+                (await this.api.fetchBlockResults(block.header.height, block.header.chainId)).results as TxData[];
 
             return {
-                ...block,
-                txs: resultTxs,
-                type: "INDEXED_TXS"
+                type: "INDEXED_TXS",
+                id: block.id,
+                header: block.header,
+                txs: this.mergeTxsWithResults(block, resultTxs)
             } as BlockWithIndexedTxs;
         }
 
         let msg = `composeBlock: Unknown dataToFetch for network ${JSON.stringify(this.network)}`;
         logger.error(msg);
         throw new Error(msg);
+    }
+
+    private mergeTxsWithResults(block: BlockWithDecodedTxs, tx: TxData[]): DecodedTxRawFull[] {
+        if (block.txs.length != tx.length) {
+            let msg = `mergeTxsWithResults: txs count from /block and from /block_results are different. Block ${block.header.height}`;
+            logger.error(msg);
+            throw new Error(msg);
+        }
+
+        let result: DecodedTxRawFull[] = [];
+        for (let i = 0; i < block.txs.length; i++) {
+            let blockTx = block.txs[i];
+            let resultTx = tx[i];
+
+            result.push({
+                code: resultTx.code,
+                tx: blockTx,
+                events: resultTx.events as any,
+                gasWanted: resultTx.gasWanted,
+                gasUsed: resultTx.gasUsed,
+                txIndex: i,
+                height: block.header.height
+            })
+        }
+        return result;
     }
 }

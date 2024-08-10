@@ -1,6 +1,7 @@
 import { Entity, Column, ObjectId, Index, DataSource, ObjectIdColumn, createQueryBuilder, getMongoRepository } from "typeorm"
 import { BlockWithDecodedTxs, CachingOptions, DecodedTxRawFull } from "./blocksWatcher"
 import { deserializeObject, serializeObject } from "./helpers"
+import { BlockResultsResponse } from "@cosmjs/tendermint-rpc"
 
 @Entity()
 export class CachedBlock {
@@ -99,19 +100,19 @@ export class IndexerStorage {
         let cached = await repo.findOne({ where: { height } });
 
         if (cached) {
-            let result = deserializeObject<DecodedTxRawFull[]>(cached.data);
+            let result = deserializeObject<BlockResultsResponse>(cached.data);
             return result;
         }
     }
 
-    async saveBlockResults(txs: DecodedTxRawFull[], height: number, chainId: string) {
+    async saveBlockResults(results: BlockResultsResponse, height: number, chainId: string) {
         if (!this.options.enabled) return;
 
         let repo = this.dataSource.getRepository(CachedBlockResult);
         await repo.save({
             height,
             chainId,
-            data: serializeObject(txs)
+            data: serializeObject(results)
         });
     }
 

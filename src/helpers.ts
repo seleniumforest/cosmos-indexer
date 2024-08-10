@@ -1,5 +1,4 @@
 import { Logger } from "tslog";
-import { BlockType, BlockWithIndexedTxs, IndexerBlock } from "./blocksWatcher";
 
 /**
  * 

@@ -1,6 +1,6 @@
 import { Block, IndexedTx, SearchTxQuery, StargateClient } from "@cosmjs/stargate";
 import { logger } from "./helpers";
-import { CometClient, connectComet } from "@cosmjs/tendermint-rpc";
+import { BlockResultsResponse, CometClient, connectComet } from "@cosmjs/tendermint-rpc";
 
 export class IndexerClient extends StargateClient {
     ok: number = 0;
@@ -24,7 +24,7 @@ export class IndexerClient extends StargateClient {
         return await this.useResultReporting(() => super.getBlock(height));
     }
 
-    async getBlockResults(height?: number | undefined): Promise<Block> {
+    async getBlockResults(height?: number | undefined): Promise<BlockResultsResponse> {
         logger.silly(`Trying to fetch block ${height} from ${this.rpcUrl}`)
         return await this.useResultReporting(() => super.forceGetCometClient().blockResults(height));
     }
