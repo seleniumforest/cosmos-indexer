@@ -8,19 +8,16 @@ import { StatusResponse } from "@cosmjs/tendermint-rpc/build/comet38";
 
 export class NetworkManager {
     protected readonly minRequestsToTest: number = 20;
-    readonly network: Network;
-    protected clients: IndexerClient[] = [];
     static readonly chainInfoCache = new Map<string, { timestamp: number, chain: Chain }>();
     static readonly defaultSyncWindow = INTERVALS.second * 30; // 30s
 
     private constructor(
-        network: Network,
-        addChainRegistryRpcs: boolean = false,
-        syncWindow: number = NetworkManager.defaultSyncWindow,
-        clients: IndexerClient[],
+        public network: Network,
+        private addChainRegistryRpcs: boolean = false,
+        private syncWindow: number = NetworkManager.defaultSyncWindow,
+        private clients: IndexerClient[],
         cachingEnabled: boolean
     ) {
-        this.network = network;
 
         if (clients.length === 0) {
             if (cachingEnabled) {
@@ -33,27 +30,11 @@ export class NetworkManager {
             }
         }
 
-        this.clients = clients;
-
         setInterval(() => this.logStatus(), INTERVALS.hour);
         if (addChainRegistryRpcs) {
             setInterval(() => {
-                (async () => {
-                    logger.info("Updating rpcs...");
-                    let newClients = await NetworkManager.fetchClients(network, addChainRegistryRpcs, syncWindow);
-                    let newRpcSet = [...this.clients];
-                    for (const newRpc of newClients) {
-                        if (!!newRpcSet.find(x => x.rpcUrl === newRpc.rpcUrl))
-                            continue;
-
-                        newRpcSet.push(newRpc);
-                        logger.info(`New RPC ${newRpc.rpcUrl}`);
-                    }
-
-                    this.clients = newRpcSet;
-                    logger.info("Current Endpoint Set:", this.clients.map(x => x.rpcUrl))
-                })();
-            }, INTERVALS.day);
+                this.refreshRpcStatus()
+            }, INTERVALS.hour);
         }
     }
 
@@ -154,6 +135,22 @@ export class NetworkManager {
             rpc: chainInfo.apis?.rpc?.map(x => x.address)!,
             rest: chainInfo.apis?.rest?.map(x => x.address)!
         };
+    }
+
+    async refreshRpcStatus() {
+        logger.info("Updating rpcs...");
+        let newClients = await NetworkManager.fetchClients(this.network, this.addChainRegistryRpcs, this.syncWindow);
+        let newRpcSet = [...this.clients];
+        for (const newRpc of newClients) {
+            if (!!newRpcSet.find(x => x.rpcUrl === newRpc.rpcUrl))
+                continue;
+
+            newRpcSet.push(newRpc);
+            logger.info(`New RPC ${newRpc.rpcUrl}`);
+        }
+
+        this.clients = newRpcSet;
+        logger.info("Current Endpoint Set:", this.clients.map(x => x.rpcUrl))
     }
 
     //<kekw>

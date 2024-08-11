@@ -1,7 +1,7 @@
 import { TxData } from "@cosmjs/tendermint-rpc";
 import { ApiManager } from "./apiManager";
 import { BlockWithDecodedTxs, BlockWithIndexedTxs, DecodedTxRawFull, IndexerBlock, Network } from "./blocksWatcher";
-import { isRejected, logger } from "./helpers";
+import { INTERVALS, isRejected, logger, waitFor } from "./helpers";
 import { IndexerStorage } from "./storage";
 
 export class BatchComposer {
@@ -21,20 +21,34 @@ export class BatchComposer {
             .map(i => i + from)
             .filter(x => x <= latestHeight);
 
-        let blockResults = await Promise.allSettled(
-            targetBlocks.map(async (num) => await this.getComposedBlock(num))
-        );
-
-        blockResults
-            .filter(isRejected)
-            .forEach(x => logger.warn(`targetBlocks ${targetBlocks.at(0)}-${targetBlocks.at(-1)} rejection reason: ${x.reason}`))
+        let blockResults = await this.tryComposeUntilResolved(targetBlocks)
 
         let blocks = blockResults
-            .map(b => (b as PromiseFulfilledResult<IndexerBlock>)?.value)
             .sort((a, b) => a.header.height > b.header.height ? 1 : -1);
 
         this.memoizedBatchBlocks.clear();
         return blocks;
+    }
+
+    private async tryComposeUntilResolved(targetBlocks: number[]) {
+        let retry = 0;
+
+        while (true) {
+            try {
+                return await Promise.all(
+                    targetBlocks.map(async (num) => await this.getComposedBlock(num))
+                );
+            } catch (e) {
+                //in future, with monitoring system, we should drop notification here
+                retry++;
+                console.warn(`tryComposeUntilResolved: Failed ${retry} times to compose batch ${targetBlocks}, please look asap`);
+
+                if (retry % 10 === 0)
+                    await this.api.manager.refreshRpcStatus();
+                else
+                    await waitFor(2 * INTERVALS.minute);
+            }
+        }
     }
 
     private async getComposedBlock(height: number) {

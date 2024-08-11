@@ -1,20 +1,19 @@
 import { NetworkManager } from "./networkManager";
-import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
-import { BlockWithDecodedTxs, BlocksWatcherNetwork, DecodedTxRawFull } from "./blocksWatcher";
+import { INTERVALS, awaitWithTimeout, isFulfilled, logger, waitFor } from "./helpers";
+import { BlockWithDecodedTxs, BlocksWatcherNetwork } from "./blocksWatcher";
 import { SearchTxQuery } from "@cosmjs/stargate";
 import { IndexerStorage } from "./storage";
 import { BlockResultsResponse, StatusResponse, connectComet } from "@cosmjs/tendermint-rpc";
 import { decodeAndTrimBlock, trimBlockResults } from "./decoder";
 
 export class ApiManager {
-    protected readonly manager: NetworkManager;
-    protected readonly storage: IndexerStorage;
     protected readonly retryCounts: number;
 
-    protected constructor(manager: NetworkManager, storage: IndexerStorage, retryCounts?: number) {
+    protected constructor(
+        public manager: NetworkManager,
+        private storage: IndexerStorage,
+        retryCounts?: number) {
         this.retryCounts = retryCounts || 3;
-        this.manager = manager;
-        this.storage = storage;
     }
 
     static async createApiManager(
@@ -108,7 +107,7 @@ export class ApiManager {
             return cached;
 
         //keep 60s for fat blocks
-        let response = await this.fetchBlockResultsWithTimeout(height);
+        let response = await this.fetchBlockResultsWithTimeout(height, INTERVALS.minute);
 
         if (this.storage.options.trimIbcProofs)
             response = trimBlockResults(response);
@@ -143,7 +142,7 @@ export class ApiManager {
 
         let message = `Couldn't get transactions with query ${query} for network ${this.manager.network.name} with endpoints set`;
         logger.error(message, clients.map(x => x.rpcUrl))
-        return Promise.reject();
+        return Promise.reject(message);
     }
 
     private async fetchBlockResultsWithTimeout(height: number, timeout = INTERVALS.second * 10) {
@@ -162,10 +161,12 @@ export class ApiManager {
                     logger.warn(msg, err);
                 }
             }
+
+            await waitFor(INTERVALS.second * 10)
         }
 
         let message = `Couldn't get block results for height ${height} for network ${this.manager.network.name} with endpoints set`;
         logger.error(message, clients.map(x => x.rpcUrl))
-        return Promise.reject();
+        return Promise.reject(message);
     }
 }

@@ -19,6 +19,10 @@ export async function awaitWithTimeout<T>(promise: Promise<T>, timeoutMs: number
     return Promise.race([promise, timeoutPromise]);
 }
 
+export async function waitFor(timeoutMs: number) {
+    return await new Promise(res => setTimeout(res, timeoutMs));
+}
+
 export function serializeObject(obj: any) {
     function replacer(_key: any, value: any) {
         if (value instanceof Uint8Array) {
