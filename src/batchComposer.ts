@@ -106,7 +106,8 @@ export class BatchComposer {
                 gasWanted: resultTx.gasWanted,
                 gasUsed: resultTx.gasUsed,
                 txIndex: i,
-                height: block.header.height
+                height: block.header.height,
+                txhash: blockTx.txhash || `${block.header.height}:${i}`
             })
         }
         return result;

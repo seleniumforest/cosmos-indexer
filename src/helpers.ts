@@ -1,4 +1,5 @@
 import { Logger } from "tslog";
+import Timeout from 'await-timeout';
 
 /**
  * 
@@ -10,13 +11,7 @@ export const isFulfilled = <T,>(p: PromiseSettledResult<T>): p is PromiseFulfill
 export const isRejected = <T,>(p: PromiseSettledResult<T>): p is PromiseRejectedResult => p.status === 'rejected';
 
 export async function awaitWithTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMsg?: string): Promise<T> {
-    const timeoutPromise = new Promise<T>((_, reject) => {
-        setTimeout(() => {
-            reject(new Error(errorMsg || `Timeout ${timeoutMs} exceeded`));
-        }, timeoutMs);
-    });
-
-    return Promise.race([promise, timeoutPromise]);
+    return Timeout.wrap(promise, timeoutMs, errorMsg || `Timeout ${timeoutMs} exceeded`);
 }
 
 export async function waitFor(timeoutMs: number) {

@@ -4,6 +4,7 @@ import { decodeTxRaw } from "@cosmjs/proto-signing";
 import { Any } from "cosmjs-types/google/protobuf/any";
 import { BlockResultsResponse, Event } from "@cosmjs/tendermint-rpc";
 import { fromUtf8 } from "@cosmjs/encoding";
+import * as crypto from 'crypto';
 
 const BlacklistedMsgs = [
     //this produces update_client event with fatty "header" value
@@ -41,6 +42,12 @@ function cleanEvents(events: readonly Event[]): Event[] {
     })
 }
 
+function sha256FromUint8Array(uint8Array: Uint8Array): string {
+    const hash = crypto.createHash('sha256');
+    hash.update(Buffer.from(uint8Array));
+    return hash.digest('hex').toUpperCase();
+}
+
 export function decodeAndTrimBlock(block: Block, trim: boolean): BlockWithDecodedTxs {
     return {
         type: "RAW_TXS",
@@ -49,7 +56,10 @@ export function decodeAndTrimBlock(block: Block, trim: boolean): BlockWithDecode
             let decoded = decodeTxRaw(tx);
             if (trim)
                 decoded.body.messages = cleanMessages(decoded.body.messages);
-            return decoded;
+            return {
+                ...decoded,
+                txhash: sha256FromUint8Array(tx)
+            };
         })
     };
 }

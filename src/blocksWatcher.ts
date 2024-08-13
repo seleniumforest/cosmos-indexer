@@ -257,6 +257,7 @@ export type DecodedTxRawFull = {
     height: number;
     code: number;
     tx: DecodedTxRaw;
+    txhash: string;
     events: Event[];
     gasWanted: bigint;
     gasUsed: bigint;
@@ -265,7 +266,7 @@ export type DecodedTxRawFull = {
 
 export interface BlockWithDecodedTxs extends Omit<Block, "txs"> {
     type: "RAW_TXS",
-    txs: DecodedTxRaw[]
+    txs: (DecodedTxRaw & { txhash: string })[]
 }
 
 export interface BlockWithIndexedTxs extends Omit<Block, "txs"> {

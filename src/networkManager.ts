@@ -3,7 +3,7 @@ import { Network } from "./blocksWatcher";
 import { INTERVALS, awaitWithTimeout, isFulfilled, logger } from "./helpers";
 import { chains } from "chain-registry";
 import { IndexerClient } from "./indexerClient";
-import { connectComet } from "@cosmjs/tendermint-rpc";
+import { CometClient, connectComet } from "@cosmjs/tendermint-rpc";
 import { StatusResponse } from "@cosmjs/tendermint-rpc/build/comet38";
 
 export class NetworkManager {
@@ -38,6 +38,7 @@ export class NetworkManager {
         }
     }
 
+    /** @internal */
     static async create(
         network: Network,
         addChainRegistryRpcs: boolean = false,
@@ -67,8 +68,8 @@ export class NetworkManager {
         }
 
         logger.trace(`Checking ${network.name} RPCs...`);
-        registryRpcUrls = await this.filterRpcs(network, registryRpcUrls, onlyIndexingRpcs, syncWindow);
-        customRpcUrls = await this.filterRpcs(network, customRpcUrls, onlyIndexingRpcs, syncWindow)
+        registryRpcUrls = await this.filterRpcs(network, registryRpcUrls, onlyIndexingRpcs, syncWindow, true);
+        customRpcUrls = await this.filterRpcs(network, customRpcUrls, onlyIndexingRpcs, syncWindow, true)
 
         let registryRpcClients = await this.getClients(registryRpcUrls, false);
         let customRpcClients = await this.getClients(customRpcUrls, true);
@@ -80,13 +81,15 @@ export class NetworkManager {
         network: Network,
         urls: string[],
         onlyIndexingRpcs?: boolean,
-        syncWindow?: number //difference between latest block and now, in seconds
+        syncWindow?: number, //difference between latest block and now, in seconds
+        logResults?: boolean
     ): Promise<string[]> {
         let handler = async (url: string) => {
             let status: StatusResponse;
             try {
                 let client = await connectComet(url);
                 status = await client.status();
+                client.disconnect();
             } catch (err: any) {
                 return Promise.reject(`${url} is dead : ${err}`);
             }
@@ -115,7 +118,7 @@ export class NetworkManager {
 
         let result = await Promise.allSettled(urls.map(url => handlerWithTimeout(url)));
 
-        if (result.length > 0) {
+        if (result.length > 0 && logResults) {
             logger.info(`RPC Status for network ${network.name}:`);
             result.forEach(rpc => {
                 if (isFulfilled(rpc))
@@ -236,5 +239,14 @@ export class NetworkManager {
         }
 
         return result;
+    }
+
+    static async getAliveRegistryRpcs(
+        networkName: string,
+        syncWindowMsec: number = NetworkManager.defaultSyncWindow,
+        indexing: boolean = false) {
+        let rpcs = await this.getChainInfo(networkName);
+        let filtered = await this.filterRpcs({ name: networkName }, rpcs.apis?.rpc?.map(x => x.address) || [], indexing, syncWindowMsec, false);
+        return filtered;
     }
 }
